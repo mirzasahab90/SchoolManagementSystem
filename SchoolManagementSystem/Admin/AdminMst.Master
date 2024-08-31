@@ -50,47 +50,80 @@
                         </div>
                     </div>
 
-                    <ul class="siderbar_menu">
+                   <ul class="siderbar_menu">
                         <li>
-                            <a href="#"><span class="icon"><i class="fas fa-home"></i></span><span class="text">Dashboard</span></a>
+                            <a href="../Admin/AdminHome.aspx">
+                                <div class="icon"><i class="fas fa-home"></i></div>
+                                <div class="title">Home</div>
+                            </a>
                         </li>
                         <li>
-                            <a href="#"><span class="icon"><i class="fas fa-user"></i></span><span class="text">Students</span><span class="arrow"><i class="fas fa-chevron-down"></i></span></a>
+                            <a href="#">
+                                <div class="icon"><i class="fas fa-hotel"></i></div>
+                                <div class="title">Class</div>
+                                <div class="arrow"><i class="fas fa-chevron-down"></i></div>
+                            </a>
                             <ul class="accordion">
-                                <li><a href="#">Add Student</a></li>
-                                <li><a href="#">Manage Students</a></li>
+                                <li><a href="../Admin/AddClass.aspx" class="active"><i class="fas fa-user-plus pr-1"></i>Add Class</a></li>
+                                <li><a href="../Admin/ClassFees.aspx" class="active"><i class="fas fa-money-bill-alt pr-1"></i>Class Fees</a></li>
                             </ul>
                         </li>
                         <li>
-                            <a href="#"><span class="icon"><i class="fas fa-users"></i></span><span class="text">Teachers</span><span class="arrow"><i class="fas fa-chevron-down"></i></span></a>
+                            <a href="../Admin/Subject.aspx">
+                                <div class="icon"><i class="fas fa-book"></i></div>
+                                <div class="title">Subjects</div>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#">
+                                <div class="icon"><i class="fas fa-user-tie"></i></div>
+                                <div class="title">Teachers</div>
+                                <div class="arrow"><i class="fas fa-chevron-down"></i></div>
+                            </a>
                             <ul class="accordion">
-                                <li><a href="#">Add Teacher</a></li>
-                                <li><a href="#">Manage Teachers</a></li>
+                                <li><a href="../Admin/Teacher.aspx" class="active"><i class="fas fa-user-plus pr-1"></i>Add Teachers</a></li>
+                                <li><a href="../Admin/TeacherSubject.aspx" class="active"><i class="fas fa-book-reader pr-1"></i>Teachers Subject</a></li>
+                                <li><a href="../Admin/Expense.aspx" class="active"><i class="fas fa-hand-holding-usd pr-1"></i>Add Expense</a></li>
+                                <li><a href="../Admin/ExpenseDetails.aspx" class="active"><i class="fas fa-money-check-alt pr-1"></i>Expense Details</a></li>
                             </ul>
                         </li>
                         <li>
-                            <a href="#"><span class="icon"><i class="fas fa-book"></i></span><span class="text">Courses</span><span class="arrow"><i class="fas fa-chevron-down"></i></span></a>
+                            <a href="#">
+                                <div class="icon"><i class="fas fa-user-graduate"></i></div>
+                                <div class="title">Students</div>
+                                <div class="arrow"><i class="fas fa-chevron-down"></i></div>
+                            </a>
                             <ul class="accordion">
-                                <li><a href="#">Add Course</a></li>
-                                <li><a href="#">Manage Courses</a></li>
+                                <li><a href="../Admin/Student.aspx" class="active"><i class="fas fa-users pr-1"></i>Add Students</a></li>
+                                <li><a href="../Admin/StudAttendanceDetails.aspx" class="active"><i class="far fa-list-alt pr-1"></i>Attendance Details</a></li>
+                            </ul>
+
+                        </li>
+                        <li>
+                            <a href="#">
+                                <div class="icon"><i class="fas fa-clipboard-list"></i></div>
+                                <div class="title">Examination</div>
+                                <div class="arrow"><i class="fas fa-chevron-down"></i></div>
+                            </a>
+                            <ul class="accordion">
+                                <li><a href="../Admin/Marks.aspx" class="active"><i class="fas fa-notes-medical pr-1"></i>Add Marks</a></li>
+                                <li><a href="../Admin/MarkDetails.aspx" class="active"><i class="fas fa-clipboard-check pr-1"></i>Marks Details</a></li>
                             </ul>
                         </li>
                         <li>
-                            <a href="#"><span class="icon"><i class="fas fa-calendar"></i></span><span class="text">Events</span><span class="arrow"><i class="fas fa-chevron-down"></i></span></a>
+                            <a href="#">
+                                <div class="icon"><i class="fas fa-calendar-alt"></i></div>
+                                <div class="title">Attendance</div>
+                                <div class="arrow"><i class="fas fa-chevron-down"></i></div>
+                            </a>
                             <ul class="accordion">
-                                <li><a href="#">Add Event</a></li>
-                                <li><a href="#">Manage Events</a></li>
+                                <li><a href="../Admin/EmployeeAttendance.aspx" class="active"><i class="fas fa-calendar-plus pr-1"></i>Employee Attendance</a></li>
+                                <li><a href="../Admin/EmpAttendanceDetails.aspx" class="active"><i class="fas fa-calendar-check pr-1"></i>Employee Details</a></li>
                             </ul>
-                        </li>
-                        <li>
-                            <a href="#"><span class="icon"><i class="fas fa-bell"></i></span><span class="text">Notifications</span></a>
-                        </li>
-                        <li>
-                            <a href="#"><span class="icon"><i class="fas fa-cog"></i></span><span class="text">Settings</span></a>
                         </li>
                         <li class="logout_btn">
-                            <a href="#"><i class="fas fa-sign-out-alt"></i>Logout</a>
-                        </li>
+        <a href="#"><i class="fas fa-sign-out-alt"></i>Logout</a>
+    </li>
                     </ul>
                 </div>
             </div>

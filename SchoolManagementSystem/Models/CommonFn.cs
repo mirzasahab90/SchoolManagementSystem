@@ -12,28 +12,22 @@ namespace SchoolManagementSystem.Models
     {
         public class Commonfnx
         {
-            SqlConnection con = new SqlConnection(ConfigurationManager.ConnectionStrings["SchoolCS"].ConnectionString);
-            public void Query(string query) 
+            Connection conn = new Connection();
+            public void Query(string query)
             {
-               if(con.State == ConnectionState.Closed)
-                {
-                    con.Open();
-                }
-               SqlCommand cmd = new SqlCommand(query, con);
+                SqlCommand cmd = new SqlCommand(query, conn.Connect());
                 cmd.ExecuteNonQuery();
-                con.Close();
+                conn.Close();
+
             }
 
-            public DataTable Fetch(string query) 
+            public DataTable Fetch(string query)
             {
-                if (con.State == ConnectionState.Closed)
-                {
-                    con.Open();
-                }
-                SqlCommand cmd = new SqlCommand(query, con);
+                SqlCommand cmd = new SqlCommand(query, conn.Connect());
                 SqlDataAdapter sda = new SqlDataAdapter(cmd);
                 DataTable dt = new DataTable();
                 sda.Fill(dt);
+                conn.Close();
                 return dt;
             }
         }
