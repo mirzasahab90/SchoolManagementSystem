@@ -9,7 +9,7 @@ namespace SchoolManagementSystem.Admin
         Commonfnx fn = new Commonfnx();
         protected void Page_Load(object sender, EventArgs e)
         {
-            if (!IsPostBack)
+            if (IsPostBack)
             {
                 GetClass();
             }
@@ -17,9 +17,21 @@ namespace SchoolManagementSystem.Admin
 
         private void GetClass()
         {
-            DataTable dt = fn.Fetch("Select Row_NUMBER() over(Order by(Select 1)) as [Sr.No], ClassId, ClassName from Class");
-            GridView1.DataSource = dt;
-            GridView1.DataBind();
+            try
+            {
+                DataTable dt = fn.Fetch("Select Row_NUMBER() over(Order by(Select 1)) as [Sr.No], ClassId, ClassName from tbl_class");
+                if (dt != null)
+                {
+                    GridView1.DataSource = dt;
+                    GridView1.DataBind();
+                }
+            }
+            catch (Exception ex)
+            {
+                lblMsg.Text = $"Something went wrong - {ex}";
+                throw;
+            }
+            
         }
 
         protected void btnAdd_Click(object sender, EventArgs e)

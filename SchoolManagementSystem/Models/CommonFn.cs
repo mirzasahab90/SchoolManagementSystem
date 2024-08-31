@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
-using System.Linq;
-using System.Web;
 
 namespace SchoolManagementSystem.Models
 {
@@ -15,20 +11,34 @@ namespace SchoolManagementSystem.Models
             Connection conn = new Connection();
             public void Query(string query)
             {
-                SqlCommand cmd = new SqlCommand(query, conn.Connect());
-                cmd.ExecuteNonQuery();
-                conn.Close();
-
+                try
+                {
+                    SqlCommand cmd = new SqlCommand(query, conn.Connect());
+                    cmd.ExecuteNonQuery();
+                    conn.Close();
+                }
+                catch (Exception ex)
+                {
+                    throw;
+                }
             }
 
             public DataTable Fetch(string query)
             {
-                SqlCommand cmd = new SqlCommand(query, conn.Connect());
-                SqlDataAdapter sda = new SqlDataAdapter(cmd);
-                DataTable dt = new DataTable();
-                sda.Fill(dt);
-                conn.Close();
-                return dt;
+                try
+                {
+                    SqlCommand cmd = new SqlCommand(query, conn.Connect());
+                    SqlDataAdapter sda = new SqlDataAdapter(cmd);
+                    DataTable dt = new DataTable();
+                    sda.Fill(dt);
+                    conn.Close();
+                    return dt;
+                }
+                catch (Exception ex)
+                {
+                    throw;
+                }
+                
             }
         }
     }

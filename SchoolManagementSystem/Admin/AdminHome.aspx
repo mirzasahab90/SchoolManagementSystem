@@ -1,9 +1,9 @@
-﻿<%@ Page Title="" Language="C#" MasterPageFile="~/Admin/AdminMst.Master" AutoEventWireup="true" CodeBehind="AdminHome.aspx.cs" Inherits="SchoolManagementSystem.Admin.AdminHome" %>
+﻿<%@ Page Title="" Language="C#" MasterPageFile="../MasterPage/AdminMst.Master" AutoEventWireup="true" CodeBehind="AdminHome.aspx.cs" Inherits="SchoolManagementSystem.Admin.AdminHome" %>
 <asp:Content ID="Content1" ContentPlaceHolderID="head" runat="server">
 </asp:Content>
 <asp:Content ID="Content2" ContentPlaceHolderID="ContentPlaceHolder1" runat="server">
 
-    <div style="background-image: url('../Images/logo.png'); width: 100%; height: 920px; background-repeat: no-repeat; background-size: 600px 600px; background-position: center; padding: 0px;">
+    <div style="background-image: url('../CssContent/Images/logo.png'); width: 100%; height: 920px; background-repeat: no-repeat; background-size: 600px 600px; background-position: center; padding: 0px;">
     <div class="container p-md-4 p-sm-4">
         <div>
             <asp:Label ID="lblMsg" runat="server"></asp:Label>
