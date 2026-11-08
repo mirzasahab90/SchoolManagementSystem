@@ -7,6 +7,7 @@ using SchoolManagementSystem.Application.Repository;
 using SchoolManagementSystem.Application.Utilities.Security;
 using SchoolManagementSystem.Domain.Abstractions;
 using SchoolManagementSystem.Domain.Configuration;
+using SchoolManagementSystem.Domain.Constants;
 using SchoolManagementSystem.Domain.DTOs.Auth;
 using SchoolManagementSystem.Domain.Entities.Identity;
 
@@ -29,7 +30,7 @@ public class TokenService(
             new(JwtRegisteredClaimNames.Email, user.Email),
             new(JwtRegisteredClaimNames.Name, user.FullName),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
-            new("hq", user.IsHq ? "1" : "0"),
+            new("hq", user.IsHq || roles.Contains(SystemRoles.SuperAdmin) ? "1" : "0"),
         };
         claims.AddRange(roles.Select(role => new Claim("role", role)));
 

@@ -34,6 +34,9 @@ export type CurrentUser = {
   menu: MenuItem[];
   campuses: CampusOption[];
   activeCampusId?: number | null;
+  schoolName?: string | null;
+  schoolShortName?: string | null;
+  permissions: Record<string, string[]>;
 };
 
 export type AuthResult = {
@@ -155,6 +158,17 @@ export type KpiCard = {
   href?: string | null;
 };
 
+export type QuickAction = {
+  id: string;
+  label: string;
+  description: string;
+  href: string;
+};
+
 export type Dashboard = {
+  schoolName: string;
+  schoolShortName?: string | null;
+  activeCampusName?: string | null;
   kpis: KpiCard[];
+  quickActions: QuickAction[];
 };

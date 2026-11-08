@@ -17,9 +17,17 @@ type AuthContextValue = {
   logout: () => Promise<void>;
   refreshMe: () => Promise<void>;
   setActiveCampus: (campusId: number) => Promise<void>;
+  can: (moduleKey: string, action: string) => boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+function normalizeUser(raw: CurrentUser): CurrentUser {
+  return {
+    ...raw,
+    permissions: raw.permissions ?? {},
+  };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CurrentUser | null>(null);
@@ -30,10 +38,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       return;
     }
-    const me = await unwrap(api.get("/auth/me"));
-    setUser(me as CurrentUser);
-    if ((me as CurrentUser).activeCampusId) {
-      tokenStore.setCampusId((me as CurrentUser).activeCampusId!);
+    const me = normalizeUser((await unwrap(api.get("/auth/me"))) as CurrentUser);
+    setUser(me);
+    if (me.activeCampusId) {
+      tokenStore.setCampusId(me.activeCampusId);
     }
   }, []);
 
@@ -53,12 +61,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refreshMe]);
 
   const login = useCallback(async (email: string, password: string) => {
-    const result = await unwrap(api.post("/auth/login", { email, password })) as AuthResult;
+    const result = (await unwrap(api.post("/auth/login", { email, password }))) as AuthResult;
     tokenStore.setAccess(result.tokens.accessToken);
-    if (result.user.activeCampusId) {
-      tokenStore.setCampusId(result.user.activeCampusId);
+    const next = normalizeUser(result.user);
+    if (next.activeCampusId) {
+      tokenStore.setCampusId(next.activeCampusId);
     }
-    setUser(result.user);
+    setUser(next);
   }, []);
 
   const logout = useCallback(async () => {
@@ -72,14 +81,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
-  const setActiveCampus = useCallback(async (campusId: number) => {
-    tokenStore.setCampusId(campusId);
-    await refreshMe();
-  }, [refreshMe]);
+  const setActiveCampus = useCallback(
+    async (campusId: number) => {
+      tokenStore.setCampusId(campusId);
+      await refreshMe();
+    },
+    [refreshMe],
+  );
+
+  const can = useCallback(
+    (moduleKey: string, action: string) => {
+      if (!user) return false;
+      if (user.isSuperAdmin) return true;
+      const actions = user.permissions?.[moduleKey] ?? [];
+      return actions.some((a) => a.toLowerCase() === action.toLowerCase());
+    },
+    [user],
+  );
 
   const value = useMemo(
-    () => ({ user, loading, login, logout, refreshMe, setActiveCampus }),
-    [user, loading, login, logout, refreshMe, setActiveCampus],
+    () => ({ user, loading, login, logout, refreshMe, setActiveCampus, can }),
+    [user, loading, login, logout, refreshMe, setActiveCampus, can],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

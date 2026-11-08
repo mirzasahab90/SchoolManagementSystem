@@ -29,4 +29,9 @@ public class RolesController(IRoleService roleService) : ApiControllerBase
     [HasPermission(AppModules.Roles, AppActions.Edit)]
     public async Task<ActionResult<ResponseDto<RoleDetailDto>>> Update(int id, [FromBody] SaveRolePermissionsRequest request, CancellationToken ct) =>
         FromResult(await roleService.UpdateAsync(id, request, ct));
+
+    [HttpDelete("{id:int}")]
+    [HasPermission(AppModules.Roles, AppActions.Delete)]
+    public async Task<ActionResult<ResponseDto<object>>> Delete(int id, CancellationToken ct) =>
+        FromResult(await roleService.DeleteAsync(id, ct));
 }

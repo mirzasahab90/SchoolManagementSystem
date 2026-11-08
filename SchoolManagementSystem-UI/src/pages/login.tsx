@@ -32,22 +32,24 @@ export function LoginPage() {
     <div className="grid min-h-screen lg:grid-cols-2">
       <div className="relative hidden overflow-hidden lg:block">
         <img src={loginHero} alt="School Management System" className="absolute inset-0 h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[oklch(0.2_0.05_230/80%)] via-[oklch(0.25_0.05_230/35%)] to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[oklch(0.2_0.05_230/85%)] via-[oklch(0.25_0.05_230/40%)] to-transparent" />
         <div className="absolute inset-x-0 bottom-0 p-10 text-white">
-          <div className="font-display text-3xl font-semibold">School Management System</div>
+          <div className="text-xs font-semibold tracking-[0.2em] text-white/70 uppercase">School Management System</div>
+          <div className="font-display mt-3 text-4xl font-semibold tracking-tight">One school. Many campuses.</div>
           <p className="mt-3 max-w-md text-white/85">
-            One school application with multiple campuses — admissions, fees, attendance, and more.
+            HQ admins manage campuses, roles, and access — campus teams work inside their assigned branch.
           </p>
         </div>
       </div>
-      <div className="flex items-center justify-center p-6">
-        <form onSubmit={onSubmit} className="panel w-full max-w-md space-y-4 p-8">
+      <div className="relative flex items-center justify-center p-6">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(600px_280px_at_80%_10%,oklch(0.92_0.04_210/50%),transparent)]" />
+        <form onSubmit={onSubmit} className="panel relative w-full max-w-md space-y-4 p-8">
           <div>
             <h1 className="font-display text-2xl font-semibold">Sign in</h1>
-            <p className="mt-1 text-sm text-[var(--muted-foreground)]">Use your school account</p>
+            <p className="mt-1 text-sm text-[var(--muted-foreground)]">Use your school admin account</p>
           </div>
           <Field label="Email">
-            <TextInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <TextInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="username" />
           </Field>
           <Field label="Password">
             <TextInput
@@ -55,6 +57,7 @@ export function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
             />
           </Field>
           <Btn type="submit" className="w-full" disabled={submitting}>

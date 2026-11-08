@@ -101,6 +101,22 @@ public class RoleService(SchoolManagementSystemRepositories repositories, IPermi
         return await GetAsync(id, ct);
     }
 
+    public async Task<Result> DeleteAsync(int id, CancellationToken ct = default)
+    {
+        var role = await repositories.Roles.GetTrackedAsync(id, ct);
+        if (role == null) return Error.NotFound("Role");
+        if (role.IsSystem) return Error.Validation("System roles cannot be deleted.");
+
+        var users = await repositories.Roles.CountUsersAsync(id, ct);
+        if (users > 0)
+            return Error.Validation($"Role is assigned to {users} user(s). Reassign them first.");
+
+        repositories.Roles.SoftDelete(role);
+        await repositories.SaveChangesAsync(ct);
+        permissionChecker.Invalidate();
+        return Result.Ok("Role deleted.");
+    }
+
     private async Task<RoleDetailDto> ToDetailAsync(Role role, CancellationToken ct)
     {
         var modules = await repositories.Roles.GetMenuModulesAsync(ct);

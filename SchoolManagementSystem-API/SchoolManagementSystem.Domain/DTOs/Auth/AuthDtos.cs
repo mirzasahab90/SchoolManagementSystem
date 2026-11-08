@@ -22,7 +22,11 @@ public record CurrentUserDto(
     bool MustChangePassword,
     IReadOnlyList<MenuItemDto> Menu,
     IReadOnlyList<CampusOptionDto> Campuses,
-    int? ActiveCampusId);
+    int? ActiveCampusId,
+    string? SchoolName,
+    string? SchoolShortName,
+    /// <summary>Module key → granted action codes (View/Add/Edit/Delete…). SuperAdmin may be empty; treat as full access.</summary>
+    IReadOnlyDictionary<string, IReadOnlyList<string>> Permissions);
 
 public record UserAccessDto(bool IsSuperAdmin, IReadOnlyList<string> Roles, IReadOnlyDictionary<string, HashSet<string>> ModuleActions)
 {

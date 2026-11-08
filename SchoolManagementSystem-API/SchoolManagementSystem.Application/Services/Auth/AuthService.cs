@@ -132,6 +132,12 @@ public class AuthService(
         resolvedCampus ??= campusOptions.FirstOrDefault(c => c.IsPrimary)?.Id
                            ?? campusOptions.FirstOrDefault()?.Id;
 
+        var school = await repositories.Schools.GetDtoAsync(ct);
+        var permissions = access.ModuleActions.ToDictionary(
+            kv => kv.Key,
+            kv => (IReadOnlyList<string>)kv.Value.OrderBy(a => a).ToList(),
+            StringComparer.OrdinalIgnoreCase);
+
         return new CurrentUserDto(
             user.Id,
             user.FirstName,
@@ -144,6 +150,9 @@ public class AuthService(
             user.MustChangePassword,
             menu,
             campusOptions,
-            resolvedCampus);
+            resolvedCampus,
+            school?.Name,
+            school?.ShortName,
+            permissions);
     }
 }
