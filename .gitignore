@@ -1,0 +1,17 @@
+## .NET
+**/bin/
+**/obj/
+**/.vs/
+**/App_Data/
+*.user
+*.suo
+
+## Node
+**/node_modules/
+**/dist/
+.DS_Store
+
+## Env / secrets
+.env
+.env.*
+!.env.example

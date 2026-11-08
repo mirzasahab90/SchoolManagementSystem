@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "DM Sans", ui-sans-serif, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-navy: var(--brand-navy);
+  --color-teal: var(--brand-teal);
+  --shadow-panel: 0 1px 3px 0 oklch(0.24 0.05 220 / 5%), 0 10px 20px -5px oklch(0.24 0.05 220 / 10%);
+}
+
+:root {
+  --brand-navy: oklch(0.28 0.05 230);
+  --brand-teal: oklch(0.62 0.11 195);
+  --background: oklch(0.985 0.008 220);
+  --foreground: oklch(0.24 0.04 230);
+  --card: oklch(1 0 0);
+  --primary: oklch(0.48 0.14 235);
+  --primary-foreground: oklch(0.99 0.002 230);
+  --muted: oklch(0.96 0.01 220);
+  --muted-foreground: oklch(0.5 0.03 230);
+  --border: oklch(0.9 0.015 220);
+  --sidebar: oklch(0.23 0.045 230);
+  --sidebar-foreground: oklch(0.95 0.01 220);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  color: var(--foreground);
+  background:
+    radial-gradient(1200px 500px at 10% -10%, oklch(0.92 0.04 210 / 45%), transparent 60%),
+    radial-gradient(900px 400px at 100% 0%, oklch(0.93 0.03 240 / 40%), transparent 55%),
+    var(--background);
+}
+
+h1,
+h2,
+.font-display {
+  font-family: var(--font-display);
+}
+
+.panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  box-shadow: var(--shadow-panel);
+}
+
+.brand-wash {
+  background:
+    linear-gradient(145deg, oklch(0.28 0.05 230), oklch(0.38 0.1 235) 55%, oklch(0.5 0.1 200));
+}

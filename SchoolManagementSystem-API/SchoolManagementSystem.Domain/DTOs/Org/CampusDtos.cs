@@ -1,0 +1,43 @@
+namespace SchoolManagementSystem.Domain.DTOs.Org;
+
+public record CampusDto(
+    int Id,
+    string Code,
+    string Name,
+    string? Address,
+    string? City,
+    string? State,
+    string? Country,
+    string? PostalCode,
+    string? Phone,
+    string? Email,
+    string? Website,
+    string? InChargeName,
+    string? InChargePhone,
+    string? InChargeEmail,
+    string? InChargeDesignation,
+    DateOnly? EstablishedOn,
+    int? StudentCapacity,
+    string? Notes,
+    bool IsActive,
+    int AdminUserCount);
+
+public record SaveCampusRequest(
+    string Code,
+    string Name,
+    string? Address,
+    string? City,
+    string? State,
+    string? Country,
+    string? PostalCode,
+    string? Phone,
+    string? Email,
+    string? Website,
+    string? InChargeName,
+    string? InChargePhone,
+    string? InChargeEmail,
+    string? InChargeDesignation,
+    DateOnly? EstablishedOn,
+    int? StudentCapacity,
+    string? Notes,
+    bool IsActive = true);
