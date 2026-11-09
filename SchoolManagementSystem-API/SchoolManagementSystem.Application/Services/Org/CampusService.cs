@@ -1,8 +1,11 @@
+using Microsoft.AspNetCore.Identity;
 using SchoolManagementSystem.Application.Interfaces;
 using SchoolManagementSystem.Application.Repository;
 using SchoolManagementSystem.Domain.Abstractions;
 using SchoolManagementSystem.Domain.Common;
 using SchoolManagementSystem.Domain.DTOs.Org;
+using SchoolManagementSystem.Domain.Constants;
+using SchoolManagementSystem.Domain.Entities.Identity;
 using SchoolManagementSystem.Domain.Entities.Org;
 
 namespace SchoolManagementSystem.Application.Services.Org;
@@ -10,7 +13,11 @@ namespace SchoolManagementSystem.Application.Services.Org;
 /// <summary>
 /// HQ manages every campus (create / delete included). Campus users see and edit only their own campuses.
 /// </summary>
-public class CampusService(SchoolManagementSystemRepositories repositories, ICurrentUser currentUser) : ICampusService
+public class CampusService(
+    SchoolManagementSystemRepositories repositories,
+    ICurrentUser currentUser,
+    IPasswordHasher<User> passwordHasher,
+    IPermissionChecker permissionChecker) : ICampusService
 {
     public async Task<Result<IReadOnlyList<CampusDto>>> ListAsync(CancellationToken ct = default) =>
         await repositories.Campuses.ListAsync(currentUser.ManageableCampusIds, ct);
@@ -37,9 +44,38 @@ public class CampusService(SchoolManagementSystemRepositories repositories, ICur
         if (school == null)
             return Error.Validation("School profile is missing. Seed the database first.");
 
+        User? admin = null;
+        if (request.Admin is { } adminRequest)
+        {
+            var adminError = await ValidateAdminAsync(adminRequest, ct);
+            if (adminError != null) return adminError;
+
+            var roleId = await repositories.Roles.GetHqRoleIdAsync(SystemRoles.CampusAdmin, ct);
+            if (roleId == null) return Error.Validation("The CampusAdmin role is missing. Restart the API to seed it.");
+
+            admin = new User
+            {
+                FirstName = adminRequest.FirstName.Trim(),
+                LastName = adminRequest.LastName.Trim(),
+                Email = adminRequest.Email.Trim().ToLowerInvariant(),
+                IsActive = true,
+                MustChangePassword = true
+            };
+            admin.PasswordHash = passwordHasher.HashPassword(admin, adminRequest.Password);
+            admin.UserRoles.Add(new UserRole { RoleId = roleId.Value, AssignedOn = DateTime.UtcNow, AssignedBy = currentUser.UserId });
+        }
+
         var campus = MapNew(school.Id, code, request);
         repositories.Campuses.Add(campus);
+        if (admin != null)
+        {
+            admin.UserCampuses.Add(new UserCampus { Campus = campus, IsPrimary = true });
+            repositories.Users.Add(admin);
+        }
+
+        // Campus and its admin are saved together: either both exist or neither does.
         await repositories.SaveChangesAsync(ct);
+        if (admin != null) permissionChecker.Invalidate();
         return await GetAsync(campus.Id, ct);
     }
 
@@ -90,6 +126,19 @@ public class CampusService(SchoolManagementSystemRepositories repositories, ICur
         repositories.Campuses.Remove(campus);
         await repositories.SaveChangesAsync(ct);
         return Result.Ok("Campus deleted.");
+    }
+
+    private async Task<Error?> ValidateAdminAsync(NewCampusAdminRequest admin, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(admin.FirstName) || string.IsNullOrWhiteSpace(admin.LastName))
+            return Error.Validation("Campus admin first and last name are required.");
+        if (string.IsNullOrWhiteSpace(admin.Email))
+            return Error.Validation("Campus admin email is required.");
+        if (string.IsNullOrWhiteSpace(admin.Password) || admin.Password.Length < 8)
+            return Error.Validation("Campus admin password must be at least 8 characters.");
+        if (await repositories.Users.EmailExistsAsync(admin.Email.Trim().ToLowerInvariant(), null, ct))
+            return Error.Conflict("A user with the campus admin's email already exists.");
+        return null;
     }
 
     private static Error? Validate(SaveCampusRequest request)

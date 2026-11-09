@@ -231,6 +231,74 @@ def roles_ownership(hq):
     check("campus role cannot shadow an HQ role name", s == 409, (s, r))
 
 
+# ------------------------------------------------------------------ campus-admin
+
+def campus_body(code, admin=None, **extra):
+    body = {"code": code, "name": f"QA {code}", "city": "Karachi", "isActive": True}
+    body.update(extra)
+    if admin:
+        body["admin"] = admin
+    return body
+
+
+@group
+def campus_admin_flow(hq):
+    a, _ = demo_campuses(hq)
+    pw = temp_password()
+    email = f"qa.ca.{temp_password()[4:10].lower()}@example.test".replace("-", "x").replace("_", "x")
+    s, r = call("POST", "/campuses", campus_body("QAC", {"firstName": "Qa", "lastName": "Head", "email": email, "password": pw}), token=hq)
+    ok = check("create campus with admin", s == 200 and len(r["data"].get("admins", [])) == 1
+               and r["data"]["admins"][0]["email"] == email, (s, r))
+    if not ok:
+        return
+    qac = track("campuses", r["data"]["id"])
+    admin_id = r["data"]["admins"][0]["id"]
+    track("users", admin_id)
+
+    auth = login(email, pw)
+    u = auth["user"]
+    check("admin must change password on first sign-in", u["mustChangePassword"] is True, u)
+    check("admin works only in the new campus", [c["id"] for c in u["campuses"]] == [qac] and u["activeCampusId"] == qac, u["campuses"])
+    keys = menu_keys(u)
+    check("admin menu has My campus, no Campuses", "my-campus" in keys and "campuses" not in keys, keys)
+    t = auth["tokens"]["accessToken"]
+    pw2 = temp_password()
+    call("POST", "/auth/change-password", {"currentPassword": pw, "newPassword": pw2}, token=t)
+
+    s, r = call("GET", f"/campuses/{qac}", token=t)
+    check("admin reads own campus", s == 200, (s, r))
+    campus = r["data"]
+    profile = {k: campus.get(k) for k in ["code", "name", "address", "city", "state", "country", "postalCode", "phone", "email",
+                                          "website", "inChargeName", "inChargePhone", "inChargeEmail", "inChargeDesignation",
+                                          "establishedOn", "studentCapacity", "notes", "isActive"]}
+    s, r = call("PUT", f"/campuses/{qac}", dict(profile, name="QA Renamed"), token=t)
+    check("admin edits own campus profile", s == 200 and r["data"]["name"] == "QA Renamed", (s, r))
+    s, r = call("PUT", f"/campuses/{qac}", dict(profile, code="QAZ"), token=t)
+    check("admin cannot change campus code", s == 403, (s, r))
+    s, r = call("GET", f"/campuses/{a}", token=t)
+    check("admin cannot read another campus", s == 404, (s, r))
+
+    teacher = role_id(hq, "Teacher")
+    s, r = call("POST", "/users", user_payload(campus_ids=[qac], role_ids=[teacher]), token=t)
+    check("admin creates a Teacher", s == 200, (s, r))
+    if s == 200:
+        track("users", r["data"]["id"])
+    s, r = call("POST", "/users", user_payload(campus_ids=[qac], role_ids=[role_id(hq, "CampusAdmin")]), token=t)
+    check("admin cannot create another CampusAdmin", s == 403, (s, r))
+    s, r = call("POST", "/users", user_payload(campus_ids=[], role_ids=[teacher], hq=True), token=t)
+    check("admin cannot create an HQ user", s == 403, (s, r))
+
+    s, r = call("POST", "/campuses", campus_body("QAD", {"firstName": "Qa", "lastName": "Dup", "email": email, "password": temp_password()}), token=hq)
+    check("duplicate admin email -> 409", s == 409, (s, r))
+    if s == 200:
+        track("campuses", r["data"]["id"])
+    codes = [c["code"] for c in data(call("GET", "/campuses", token=hq))]
+    check("failed create leaves no campus behind", "QAD" not in codes, codes)
+
+
+GROUPS["campus-admin"] = GROUPS.pop("campus-admin-flow")
+
+
 # ------------------------------------------------------------------ runner
 
 def main(argv):

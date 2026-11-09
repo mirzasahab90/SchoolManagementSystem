@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SchoolManagementSystem.Domain.Constants;
 using SchoolManagementSystem.Domain.DTOs.Org;
 using SchoolManagementSystem.Domain.Entities.Org;
 using SchoolManagementSystem.Infrastructure;
@@ -17,7 +18,14 @@ public class CampusRepository(SchoolManagementSystemDbContext dbContext) : BaseR
                 c.Id, c.Code, c.Name, c.Address, c.City, c.State, c.Country, c.PostalCode,
                 c.Phone, c.Email, c.Website, c.InChargeName, c.InChargePhone, c.InChargeEmail,
                 c.InChargeDesignation, c.EstablishedOn, c.StudentCapacity, c.Notes, c.IsActive,
-                c.UserCampuses.Count))
+                c.UserCampuses.Count,
+                Db.Users
+                    .Where(u => u.IsActive
+                                && u.UserCampuses.Any(uc => uc.CampusId == c.Id)
+                                && u.UserRoles.Any(ur => ur.Role.Name == SystemRoles.CampusAdmin && ur.Role.CampusId == null))
+                    .OrderBy(u => u.FirstName)
+                    .Select(u => new CampusAdminRefDto(u.Id, u.FirstName + " " + u.LastName, u.Email))
+                    .ToList()))
             .ToListAsync(ct);
     }
 

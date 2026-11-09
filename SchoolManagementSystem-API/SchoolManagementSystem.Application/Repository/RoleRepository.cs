@@ -60,5 +60,11 @@ public class RoleRepository(SchoolManagementSystemDbContext dbContext) : BaseRep
     public Task<bool> UserHasRoleAsync(int userId, int roleId, CancellationToken ct = default) =>
         Db.UserRoles.AsNoTracking().AnyAsync(ur => ur.UserId == userId && ur.RoleId == roleId, ct);
 
+    public Task<int?> GetHqRoleIdAsync(string name, CancellationToken ct = default) =>
+        Db.Roles.IgnoreQueryFilters()
+            .Where(r => !r.IsDeleted && r.CampusId == null && r.Name == name)
+            .Select(r => (int?)r.Id)
+            .FirstOrDefaultAsync(ct);
+
     public void SoftDelete(Role role) => Db.Roles.Remove(role);
 }

@@ -20,7 +20,13 @@ public record CampusDto(
     int? StudentCapacity,
     string? Notes,
     bool IsActive,
-    int AdminUserCount);
+    int AdminUserCount,
+    IReadOnlyList<CampusAdminRefDto> Admins);
+
+public record CampusAdminRefDto(int Id, string FullName, string Email);
+
+/// <summary>Optional first Campus Admin created together with a new campus.</summary>
+public record NewCampusAdminRequest(string FirstName, string LastName, string Email, string Password);
 
 public record SaveCampusRequest(
     string Code,
@@ -40,4 +46,5 @@ public record SaveCampusRequest(
     DateOnly? EstablishedOn,
     int? StudentCapacity,
     string? Notes,
-    bool IsActive = true);
+    bool IsActive = true,
+    NewCampusAdminRequest? Admin = null);
