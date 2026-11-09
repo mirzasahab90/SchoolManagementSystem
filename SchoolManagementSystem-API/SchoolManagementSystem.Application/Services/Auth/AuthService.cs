@@ -99,7 +99,6 @@ public class AuthService(
     {
         var access = await repositories.Access.GetUserAccessAsync(user.Id, ct);
         var modules = await repositories.Access.GetActiveModulesAsync(ct);
-        var menu = MenuBuilder.Build(modules, access);
         var isSuperAdmin = access.IsSuperAdmin || access.Roles.Contains(SystemRoles.SuperAdmin);
         var isHq = user.IsHq || isSuperAdmin;
 
@@ -130,6 +129,7 @@ public class AuthService(
                                ?? campusOptions.FirstOrDefault()?.Id;
         }
 
+        var menu = MenuBuilder.Build(modules, access, isHq, resolvedCampus);
         var school = await repositories.Schools.GetDtoAsync(ct);
         var permissions = access.ModuleActions.ToDictionary(
             kv => kv.Key,

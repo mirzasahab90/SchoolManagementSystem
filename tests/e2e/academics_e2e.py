@@ -96,6 +96,50 @@ def schema(hq):
     check("academic-sessions endpoint exists", s == 200, (s, r))
 
 
+# ------------------------------------------------------------------ seed
+
+def role_detail(token, name):
+    return data(call("GET", f"/roles/{role_id(token, name)}", token=token))
+
+
+def actions(detail, key):
+    cell = next((c for c in detail["matrix"] if c["moduleKey"] == key), None)
+    return {a for a in ("view", "add", "edit", "delete") if cell and cell[a]}
+
+
+@group
+def seed(hq):
+    a, _ = demo_campuses(hq)
+    me = data(call("GET", "/auth/me", token=hq))
+    check("HQ All-campuses top menu order", menu_keys(me) == ["dashboard", "campuses", "academics", "settings"], menu_keys(me))
+    academics = next((m for m in me["menu"] if m["key"] == "academics"), None)
+    check("academics children", academics and [c["key"] for c in academics["children"]]
+          == ["academic-sessions", "classes", "subjects", "sections"], academics)
+    me_a = data(call("GET", "/auth/me", token=hq, campus=a))
+    check("my-campus shown at position 2 with a campus selected", menu_keys(me_a)[:2] == ["dashboard", "my-campus"], menu_keys(me_a))
+
+    roles = data(call("GET", "/roles", token=hq))
+    ca = next((r for r in roles if r["name"] == "CampusAdmin"), None)
+    check("CampusAdmin role is HQ-owned and HQ-assign-only", ca and ca["hqAssignOnly"] and ca.get("campusId") is None, ca)
+    if ca:
+        d = role_detail(hq, "CampusAdmin")
+        full = {"view", "add", "edit", "delete"}
+        check("CampusAdmin full on users/roles/sections/my-campus",
+              all(actions(d, k) == full for k in ["users", "roles", "sections", "my-campus"]),
+              {k: actions(d, k) for k in ["users", "roles", "sections", "my-campus"]})
+        check("CampusAdmin view+edit on campuses", actions(d, "campuses") == {"view", "edit"}, actions(d, "campuses"))
+    teacher = role_detail(hq, "Teacher")
+    check("Teacher can view sections", "view" in actions(teacher, "sections"), actions(teacher, "sections"))
+    sa = next(r for r in roles if r["name"] == "SuperAdmin")
+    check("SuperAdmin is HQ-assign-only", sa["hqAssignOnly"], sa)
+
+    s, r = call("GET", "/academic-sessions", token=hq)
+    items = r["data"]["items"] if s == 200 else []
+    current = next((x for x in items if x["name"] == "2026-27"), None)
+    check("seeded HQ current session 2026-27", current and current["isCurrent"] and current.get("campusId") is None
+          and r["data"].get("effectiveCurrentId") == current["id"], (s, r))
+
+
 # ------------------------------------------------------------------ runner
 
 def main(argv):

@@ -24,6 +24,8 @@ public class DatabaseSeeder(
         await SeedSchoolAndCampusesAsync(ct);
         await SeedSuperAdminAsync(ct);
         await db.SaveChangesAsync(ct);
+        await RoleDefaultsSeeder.SeedAsync(db, ct);
+        await AcademicSeeder.SeedAsync(db, ct);
         logger.LogInformation("Database seed completed.");
     }
 
@@ -43,7 +45,7 @@ public class DatabaseSeeder(
     /// </summary>
     private async Task SeedAndSyncModulesAsync(CancellationToken ct)
     {
-        async Task<Module> Upsert(string key, string name, string? route, string? icon, int order, int? parentId)
+        async Task<Module> Upsert(string key, string name, string? route, string? icon, int order, int? parentId, bool campusLevel = false)
         {
             var module = await db.Modules.FirstOrDefaultAsync(m => m.Key == key, ct);
             if (module == null)
@@ -58,20 +60,24 @@ public class DatabaseSeeder(
             module.DisplayOrder = order;
             module.ParentId = parentId;
             module.IsActive = true;
+            module.CampusLevel = campusLevel;
             return module;
         }
 
-        var dashboard = await Upsert(AppModules.Dashboard, "Dashboard", "/admin", "layout-dashboard", 1, null);
-        var campuses = await Upsert(AppModules.Campuses, "Campuses", "/admin/campuses", "building-2", 2, null);
-        var settings = await Upsert(AppModules.Settings, "Settings", null, "settings", 3, null);
+        await Upsert(AppModules.Dashboard, "Dashboard", "/admin", "layout-dashboard", 1, null, campusLevel: true);
+        await Upsert(AppModules.MyCampus, "My campus", "/admin/my-campus", "school", 2, null, campusLevel: true);
+        await Upsert(AppModules.Campuses, "Campuses", "/admin/campuses", "building-2", 3, null);
+        var academics = await Upsert(AppModules.Academics, "Academics", null, "graduation-cap", 4, null);
+        var settings = await Upsert(AppModules.Settings, "Settings", null, "settings", 5, null);
         await db.SaveChangesAsync(ct);
 
-        await Upsert(AppModules.Users, "Users", "/admin/users", "users", 1, settings.Id);
-        await Upsert(AppModules.Roles, "Roles", "/admin/roles", "shield", 2, settings.Id);
+        await Upsert(AppModules.AcademicSessions, "Sessions", "/admin/academics/sessions", "calendar-range", 1, academics.Id, campusLevel: true);
+        await Upsert(AppModules.Classes, "Classes", "/admin/academics/classes", "layers", 2, academics.Id, campusLevel: true);
+        await Upsert(AppModules.Subjects, "Subjects", "/admin/academics/subjects", "book-open", 3, academics.Id, campusLevel: true);
+        await Upsert(AppModules.Sections, "Sections", "/admin/academics/sections", "layout-grid", 4, academics.Id, campusLevel: true);
+        await Upsert(AppModules.Users, "Users", "/admin/users", "users", 1, settings.Id, campusLevel: true);
+        await Upsert(AppModules.Roles, "Roles", "/admin/roles", "shield", 2, settings.Id, campusLevel: true);
         await db.SaveChangesAsync(ct);
-
-        _ = dashboard;
-        _ = campuses;
     }
 
     private async Task SeedRolesAsync(CancellationToken ct)

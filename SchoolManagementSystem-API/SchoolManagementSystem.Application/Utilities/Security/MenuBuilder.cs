@@ -1,3 +1,4 @@
+using SchoolManagementSystem.Domain.Constants;
 using SchoolManagementSystem.Domain.DTOs.Auth;
 using SchoolManagementSystem.Domain.Entities.Identity;
 
@@ -5,9 +6,17 @@ namespace SchoolManagementSystem.Application.Utilities.Security;
 
 public static class MenuBuilder
 {
-    public static IReadOnlyList<MenuItemDto> Build(IReadOnlyList<Module> modules, UserAccessDto access)
+    /// <summary>
+    /// Menus the user may view. "My campus" needs a working campus (hidden for HQ on All campuses);
+    /// "Campuses" (manage every branch) is head-office only — campus users use My campus instead.
+    /// </summary>
+    public static IReadOnlyList<MenuItemDto> Build(IReadOnlyList<Module> modules, UserAccessDto access, bool isHq, int? activeCampusId)
     {
-        bool CanSee(Module m) => access.IsSuperAdmin || access.Can(m.Key, "View");
+        bool Hidden(Module m) =>
+            (m.Key == AppModules.MyCampus && activeCampusId == null)
+            || (m.Key == AppModules.Campuses && !isHq);
+
+        bool CanSee(Module m) => !Hidden(m) && (access.IsSuperAdmin || access.Can(m.Key, "View"));
 
         var visibleKeys = modules.Where(CanSee).Select(m => m.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
