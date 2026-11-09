@@ -1,5 +1,6 @@
 using SchoolManagementSystem.Application.Interfaces;
 using SchoolManagementSystem.Application.Repository;
+using SchoolManagementSystem.Domain.Abstractions;
 using SchoolManagementSystem.Domain.Common;
 using SchoolManagementSystem.Domain.Constants;
 using SchoolManagementSystem.Domain.DTOs.Org;
@@ -7,8 +8,17 @@ using SchoolManagementSystem.Domain.Entities.Identity;
 
 namespace SchoolManagementSystem.Application.Services.Roles;
 
-public class RoleService(SchoolManagementSystemRepositories repositories, IPermissionChecker permissionChecker) : IRoleService
+/// <summary>
+/// Roles are organisation-wide templates, so only HQ users may create, change or delete them,
+/// and nobody but a SuperAdmin may change a role they hold themselves.
+/// </summary>
+public class RoleService(
+    SchoolManagementSystemRepositories repositories,
+    IPermissionChecker permissionChecker,
+    ICurrentUser currentUser) : IRoleService
 {
+    private static readonly Error HqOnly = Error.Forbidden("Only HQ users can manage roles; they apply to every campus.");
+
     public async Task<Result<IReadOnlyList<RoleListItemDto>>> ListAsync(CancellationToken ct = default) =>
         await repositories.Roles.ListAsync(ct);
 
@@ -21,6 +31,8 @@ public class RoleService(SchoolManagementSystemRepositories repositories, IPermi
 
     public async Task<Result<RoleDetailDto>> CreateAsync(CreateRoleRequest request, CancellationToken ct = default)
     {
+        if (!currentUser.IsHq) return HqOnly;
+
         if (string.IsNullOrWhiteSpace(request.Name))
             return Error.Validation("Role name is required.");
 
@@ -43,8 +55,16 @@ public class RoleService(SchoolManagementSystemRepositories repositories, IPermi
 
     public async Task<Result<RoleDetailDto>> UpdateAsync(int id, SaveRolePermissionsRequest request, CancellationToken ct = default)
     {
+        if (!currentUser.IsHq) return HqOnly;
+
         var role = await repositories.Roles.GetTrackedAsync(id, ct);
         if (role == null) return Error.NotFound("Role");
+
+        if (role.Name == SystemRoles.SuperAdmin && !currentUser.IsSuperAdmin)
+            return Error.Forbidden("Only a SuperAdmin can change the SuperAdmin role.");
+
+        if (!currentUser.IsSuperAdmin && await HoldsRoleAsync(id, ct))
+            return Error.Forbidden("You cannot change the permissions of a role you hold.");
 
         if (string.IsNullOrWhiteSpace(request.Name))
             return Error.Validation("Role name is required.");
@@ -103,6 +123,8 @@ public class RoleService(SchoolManagementSystemRepositories repositories, IPermi
 
     public async Task<Result> DeleteAsync(int id, CancellationToken ct = default)
     {
+        if (!currentUser.IsHq) return HqOnly;
+
         var role = await repositories.Roles.GetTrackedAsync(id, ct);
         if (role == null) return Error.NotFound("Role");
         if (role.IsSystem) return Error.Validation("System roles cannot be deleted.");
@@ -116,6 +138,11 @@ public class RoleService(SchoolManagementSystemRepositories repositories, IPermi
         permissionChecker.Invalidate();
         return Result.Ok("Role deleted.");
     }
+
+    private Task<bool> HoldsRoleAsync(int roleId, CancellationToken ct) =>
+        currentUser.UserId is int userId
+            ? repositories.Roles.UserHasRoleAsync(userId, roleId, ct)
+            : Task.FromResult(false);
 
     private async Task<RoleDetailDto> ToDetailAsync(Role role, CancellationToken ct)
     {

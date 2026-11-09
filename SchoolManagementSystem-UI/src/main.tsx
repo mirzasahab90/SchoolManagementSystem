@@ -1,17 +1,20 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { Toaster } from "sonner";
+import { ThemedToaster } from "./components/themed-toaster";
 import App from "./App";
 import { AuthProvider } from "./lib/auth";
+import { initTheme } from "./lib/theme";
 import "./styles.css";
+
+initTheme();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
         <App />
-        <Toaster richColors position="top-right" />
+        <ThemedToaster />
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,

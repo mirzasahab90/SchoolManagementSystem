@@ -21,6 +21,8 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<SchoolMana
         public int? UserId => null;
         public int? ActiveCampusId => null;
         public bool IsHq => false;
+        public bool IsSuperAdmin => false;
+        public IReadOnlySet<int> AssignedCampusIds { get; } = new HashSet<int>();
         public string? IpAddress => null;
         public string? UserAgent => null;
     }

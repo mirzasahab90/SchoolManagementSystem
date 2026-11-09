@@ -28,6 +28,9 @@ public record CurrentUserDto(
     /// <summary>Module key → granted action codes (View/Add/Edit/Delete…). SuperAdmin may be empty; treat as full access.</summary>
     IReadOnlyDictionary<string, IReadOnlyList<string>> Permissions);
 
+/// <summary>Database view of what campuses a user may work in (HQ = every campus).</summary>
+public record UserCampusAccessDto(bool IsHq, bool IsSuperAdmin, IReadOnlyList<int> CampusIds);
+
 public record UserAccessDto(bool IsSuperAdmin, IReadOnlyList<string> Roles, IReadOnlyDictionary<string, HashSet<string>> ModuleActions)
 {
     public bool Can(string moduleKey, string action) =>

@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { api, tokenStore, unwrap } from "./api";
+import { api, onInvalidCampus, tokenStore, unwrap } from "./api";
 import type { AuthResult, CurrentUser } from "./types";
 
 type AuthContextValue = {
@@ -16,7 +16,8 @@ type AuthContextValue = {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<void>;
-  setActiveCampus: (campusId: number) => Promise<void>;
+  /** Null = HQ "All campuses". */
+  setActiveCampus: (campusId: number | null) => Promise<void>;
   can: (moduleKey: string, action: string) => boolean;
 };
 
@@ -40,10 +41,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const me = normalizeUser((await unwrap(api.get("/auth/me"))) as CurrentUser);
     setUser(me);
-    if (me.activeCampusId) {
-      tokenStore.setCampusId(me.activeCampusId);
-    }
+    tokenStore.setCampusId(me.activeCampusId ?? null);
   }, []);
+
+  useEffect(
+    () =>
+      onInvalidCampus(() => {
+        void refreshMe().catch(() => undefined);
+      }),
+    [refreshMe],
+  );
 
   useEffect(() => {
     (async () => {
@@ -64,9 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = (await unwrap(api.post("/auth/login", { email, password }))) as AuthResult;
     tokenStore.setAccess(result.tokens.accessToken);
     const next = normalizeUser(result.user);
-    if (next.activeCampusId) {
-      tokenStore.setCampusId(next.activeCampusId);
-    }
+    tokenStore.setCampusId(next.activeCampusId ?? null);
     setUser(next);
   }, []);
 
@@ -82,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setActiveCampus = useCallback(
-    async (campusId: number) => {
+    async (campusId: number | null) => {
       tokenStore.setCampusId(campusId);
       await refreshMe();
     },

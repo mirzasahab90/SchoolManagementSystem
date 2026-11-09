@@ -6,6 +6,10 @@ using SchoolManagementSystem.Application.Repository;
 
 namespace SchoolManagementSystem.Application.Utilities.Security;
 
+/// <summary>
+/// Caches each user's module/action grants. Registered as a singleton so <see cref="Invalidate"/>
+/// clears the cache for every user, not just the current request.
+/// </summary>
 public class PermissionChecker(IServiceScopeFactory scopeFactory, IMemoryCache cache) : IPermissionChecker
 {
     private CancellationTokenSource _reset = new();
@@ -17,9 +21,9 @@ public class PermissionChecker(IServiceScopeFactory scopeFactory, IMemoryCache c
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10);
             entry.AddExpirationToken(new CancellationChangeToken(_reset.Token));
 
-            using var scope = scopeFactory.CreateScope();
+            await using var scope = scopeFactory.CreateAsyncScope();
             var repositories = scope.ServiceProvider.GetRequiredService<SchoolManagementSystemRepositories>();
-            return await repositories.Access.GetUserAccessAsync(userId, ct);
+            return await repositories.Access.GetUserAccessAsync(userId, CancellationToken.None);
         });
 
         return access!.Can(moduleKey, action);

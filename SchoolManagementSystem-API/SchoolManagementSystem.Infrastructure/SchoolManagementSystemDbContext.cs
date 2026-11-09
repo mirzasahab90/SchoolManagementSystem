@@ -1,4 +1,6 @@
 using System.Linq.Expressions;
+using BindingFlags = System.Reflection.BindingFlags;
+using MethodInfo = System.Reflection.MethodInfo;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using SchoolManagementSystem.Domain.Abstractions;
@@ -25,21 +27,42 @@ public class SchoolManagementSystemDbContext(DbContextOptions<SchoolManagementSy
     public DbSet<Campus> Campuses => Set<Campus>();
     public DbSet<UserCampus> UserCampuses => Set<UserCampus>();
 
+    /// <summary>Campuses the current request may read; evaluated per query by the EF filters below.</summary>
+    private IReadOnlyCollection<int> CampusFilterIds => currentUser.DataCampusIds ?? [];
+
+    private bool CampusFilterDisabled => currentUser.UserId == null || currentUser.DataCampusIds == null;
+
+    private static readonly MethodInfo ConfigureFiltersMethod =
+        typeof(SchoolManagementSystemDbContext).GetMethod(nameof(ConfigureFilters), BindingFlags.NonPublic | BindingFlags.Instance)!;
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(SchoolManagementSystemDbContext).Assembly);
 
-        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes().Where(t => t.BaseType == null).ToList())
         {
-            if (!typeof(AuditableEntity).IsAssignableFrom(entityType.ClrType))
-            {
-                continue;
-            }
+            ConfigureFiltersMethod.MakeGenericMethod(entityType.ClrType).Invoke(this, [modelBuilder]);
+        }
+    }
 
-            var parameter = Expression.Parameter(entityType.ClrType, "e");
-            var property = Expression.Property(parameter, nameof(AuditableEntity.IsDeleted));
-            var filter = Expression.Lambda(Expression.Equal(property, Expression.Constant(false)), parameter);
-            modelBuilder.Entity(entityType.ClrType).HasQueryFilter(filter);
+    /// <summary>Soft delete for auditable tables; campus isolation for <see cref="ICampusScoped"/> tables.</summary>
+    private void ConfigureFilters<TEntity>(ModelBuilder modelBuilder) where TEntity : class
+    {
+        var softDelete = typeof(AuditableEntity).IsAssignableFrom(typeof(TEntity));
+        var campusScoped = typeof(ICampusScoped).IsAssignableFrom(typeof(TEntity));
+
+        Expression<Func<TEntity, bool>>? filter = (softDelete, campusScoped) switch
+        {
+            (true, true) => e => !EF.Property<bool>(e, nameof(AuditableEntity.IsDeleted))
+                                 && (CampusFilterDisabled || CampusFilterIds.Contains(EF.Property<int>(e, nameof(ICampusScoped.CampusId)))),
+            (true, false) => e => !EF.Property<bool>(e, nameof(AuditableEntity.IsDeleted)),
+            (false, true) => e => CampusFilterDisabled || CampusFilterIds.Contains(EF.Property<int>(e, nameof(ICampusScoped.CampusId))),
+            _ => null
+        };
+
+        if (filter != null)
+        {
+            modelBuilder.Entity<TEntity>().HasQueryFilter(filter);
         }
     }
 
@@ -47,6 +70,7 @@ public class SchoolManagementSystemDbContext(DbContextOptions<SchoolManagementSy
     {
         var now = DateTime.UtcNow;
         var userId = currentUser.UserId;
+        GuardCampusScopedChanges();
 
         foreach (var entry in ChangeTracker.Entries<AuditableEntity>())
         {
@@ -71,5 +95,44 @@ public class SchoolManagementSystemDbContext(DbContextOptions<SchoolManagementSy
         }
 
         return await base.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// New campus data gets the working campus; nobody may write rows of a campus they cannot access.
+    /// Skipped for background work (no signed-in user), e.g. seeding.
+    /// </summary>
+    private void GuardCampusScopedChanges()
+    {
+        if (currentUser.UserId == null)
+        {
+            return;
+        }
+
+        foreach (var entry in ChangeTracker.Entries<ICampusScoped>())
+        {
+            if (entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted))
+            {
+                continue;
+            }
+
+            if (entry.State == EntityState.Added && entry.Entity.CampusId == 0)
+            {
+                entry.Entity.CampusId = currentUser.ActiveCampusId
+                    ?? throw new CampusAccessException("Select a working campus before adding campus records.");
+            }
+
+            if (!currentUser.CanAccessCampus(entry.Entity.CampusId))
+            {
+                throw new CampusAccessException("You do not have access to this campus.");
+            }
+
+            if (entry.State == EntityState.Modified
+                && entry.Property(nameof(ICampusScoped.CampusId)).IsModified
+                && entry.Property(nameof(ICampusScoped.CampusId)).OriginalValue is int original
+                && !currentUser.CanAccessCampus(original))
+            {
+                throw new CampusAccessException("You do not have access to this campus.");
+            }
+        }
     }
 }

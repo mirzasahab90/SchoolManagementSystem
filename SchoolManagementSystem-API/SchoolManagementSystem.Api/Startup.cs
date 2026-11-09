@@ -49,12 +49,13 @@ public class Startup(IConfiguration configuration, IWebHostEnvironment environme
 
         services.AddHttpContextAccessor();
         services.AddMemoryCache();
+        services.AddScoped<CampusScope>();
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<SchoolManagementSystemRepositories>();
         services.AddScoped<DatabaseSeeder>();
         services.AddScoped<RefreshCookie>();
         services.AddScoped<IAuthorizationHandler, PermissionHandler>();
-        services.AddScoped<IPermissionChecker, PermissionChecker>();
+        services.AddSingleton<IPermissionChecker, PermissionChecker>();
         services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
         services.AddScoped<TokenService>();
         services.AddScoped<IAuthService, AuthService>();
@@ -89,8 +90,9 @@ public class Startup(IConfiguration configuration, IWebHostEnvironment environme
         app.UseHttpsRedirection();
         app.UseRouting();
         app.UseCors();
-        app.UseRateLimiter();
         app.UseAuthentication();
+        app.UseRateLimiter();
+        app.UseMiddleware<CampusScopeMiddleware>();
         app.UseAuthorization();
 
         app.UseEndpoints(endpoints =>
@@ -182,8 +184,13 @@ public class Startup(IConfiguration configuration, IWebHostEnvironment environme
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(_ =>
-                RateLimitPartition.GetFixedWindowLimiter("global", _ => new FixedWindowRateLimiterOptions
+            // One bucket per signed-in user (or per IP for anonymous calls), not one for the whole app.
+            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    context.User.FindFirst("sub")?.Value is { } sub
+                        ? $"user:{sub}"
+                        : $"ip:{context.Connection.RemoteIpAddress}",
+                    _ => new FixedWindowRateLimiterOptions
                 {
                     PermitLimit = 300,
                     Window = TimeSpan.FromMinutes(1)

@@ -106,7 +106,7 @@ public class AuthService(
         List<CampusOptionDto> campusOptions;
         if (isHq)
         {
-            var all = await repositories.Campuses.ListAsync(ct);
+            var all = await repositories.Campuses.ListAsync(null, ct);
             var assigned = await repositories.Users.GetUserCampusesAsync(user.Id, ct);
             var primaryIds = assigned.Where(a => a.IsPrimary).Select(a => a.CampusId).ToHashSet();
             campusOptions = all
@@ -120,17 +120,15 @@ public class AuthService(
             campusOptions = campuses.Select(c => new CampusOptionDto(c.CampusId, c.Code, c.Name, c.IsPrimary)).ToList();
         }
 
-        int? resolvedCampus = null;
-        if (activeCampusId is int requested)
+        // HQ may work on "All campuses" (null). Campus users always get one of their own campuses.
+        int? resolvedCampus = activeCampusId is int requested && campusOptions.Any(c => c.Id == requested)
+            ? requested
+            : null;
+        if (!isHq)
         {
-            if (isHq || campusOptions.Any(c => c.Id == requested))
-            {
-                resolvedCampus = requested;
-            }
+            resolvedCampus ??= campusOptions.FirstOrDefault(c => c.IsPrimary)?.Id
+                               ?? campusOptions.FirstOrDefault()?.Id;
         }
-
-        resolvedCampus ??= campusOptions.FirstOrDefault(c => c.IsPrimary)?.Id
-                           ?? campusOptions.FirstOrDefault()?.Id;
 
         var school = await repositories.Schools.GetDtoAsync(ct);
         var permissions = access.ModuleActions.ToDictionary(

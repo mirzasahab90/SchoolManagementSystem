@@ -4,7 +4,11 @@ using SchoolManagementSystem.Domain.Abstractions;
 
 namespace SchoolManagementSystem.Api.Security;
 
-public class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICurrentUser
+/// <summary>
+/// Identity comes from the JWT; campus access and HQ status come from <see cref="CampusScope"/>,
+/// which the campus-scope middleware loads from the database (never trusted from the client).
+/// </summary>
+public class CurrentUser(IHttpContextAccessor httpContextAccessor, CampusScope scope) : ICurrentUser
 {
     public int? UserId
     {
@@ -16,18 +20,13 @@ public class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICurrentUse
         }
     }
 
-    public int? ActiveCampusId
-    {
-        get
-        {
-            var header = httpContextAccessor.HttpContext?.Request.Headers["X-Campus-Id"].FirstOrDefault();
-            return int.TryParse(header, out var campusId) ? campusId : null;
-        }
-    }
+    public int? ActiveCampusId => scope.ActiveCampusId;
 
-    public bool IsHq =>
-        httpContextAccessor.HttpContext?.User.FindFirstValue("hq") == "1"
-        || httpContextAccessor.HttpContext?.User.IsInRole("SuperAdmin") == true;
+    public bool IsHq => scope.IsHq;
+
+    public bool IsSuperAdmin => scope.IsSuperAdmin;
+
+    public IReadOnlySet<int> AssignedCampusIds => scope.AssignedCampusIds;
 
     public string? IpAddress => httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
 

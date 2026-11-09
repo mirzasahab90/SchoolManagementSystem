@@ -26,9 +26,15 @@ public class UserRepository(SchoolManagementSystemDbContext dbContext) : BaseRep
     public Task<bool> EmailExistsAsync(string email, int? excludeId = null, CancellationToken ct = default) =>
         Db.Users.AnyAsync(u => u.Email == email && (!excludeId.HasValue || u.Id != excludeId.Value), ct);
 
-    public async Task<List<UserListItemDto>> ListAsync(CancellationToken ct = default)
+    /// <summary>
+    /// All users, or — when <paramref name="campusIds"/> is given (campus admins) — non-HQ users
+    /// who belong to at least one of those campuses.
+    /// </summary>
+    public async Task<List<UserListItemDto>> ListAsync(IReadOnlySet<int>? campusIds = null, int? userId = null, CancellationToken ct = default)
     {
         var users = await Db.Users.AsNoTracking()
+            .Where(u => campusIds == null || (!u.IsHq && u.UserCampuses.Any(uc => campusIds.Contains(uc.CampusId))))
+            .Where(u => userId == null || u.Id == userId)
             .OrderBy(u => u.FirstName).ThenBy(u => u.LastName)
             .Select(u => new
             {
@@ -50,11 +56,8 @@ public class UserRepository(SchoolManagementSystemDbContext dbContext) : BaseRep
             u.Email, u.Phone, u.IsActive, u.IsHq, u.LastLoginOn, u.Roles, u.CampusIds)).ToList();
     }
 
-    public async Task<UserListItemDto?> GetListItemAsync(int id, CancellationToken ct = default)
-    {
-        var list = await ListAsync(ct);
-        return list.FirstOrDefault(u => u.Id == id);
-    }
+    public async Task<UserListItemDto?> GetListItemAsync(int id, IReadOnlySet<int>? campusIds = null, CancellationToken ct = default) =>
+        (await ListAsync(campusIds, id, ct)).FirstOrDefault();
 
     public async Task<List<(int CampusId, string Code, string Name, bool IsPrimary)>> GetUserCampusesAsync(int userId, CancellationToken ct = default)
     {
@@ -70,9 +73,11 @@ public class UserRepository(SchoolManagementSystemDbContext dbContext) : BaseRep
     public Task<bool> UserHasCampusAsync(int userId, int campusId, CancellationToken ct = default) =>
         Db.UserCampuses.AsNoTracking().AnyAsync(uc => uc.UserId == userId && uc.CampusId == campusId, ct);
 
-    public Task<int> CountAsync(CancellationToken ct = default) => Db.Users.CountAsync(ct);
+    public Task<int> CountAsync(IReadOnlyCollection<int>? campusIds = null, CancellationToken ct = default) =>
+        Db.Users.CountAsync(u => campusIds == null || u.UserCampuses.Any(uc => campusIds.Contains(uc.CampusId)), ct);
 
-    public Task<int> CountActiveAsync(CancellationToken ct = default) => Db.Users.CountAsync(u => u.IsActive, ct);
+    public Task<int> CountActiveAsync(IReadOnlyCollection<int>? campusIds = null, CancellationToken ct = default) =>
+        Db.Users.CountAsync(u => u.IsActive && (campusIds == null || u.UserCampuses.Any(uc => campusIds.Contains(uc.CampusId))), ct);
 
     public Task<List<Role>> GetRolesByIdsAsync(IEnumerable<int> roleIds, CancellationToken ct = default) =>
         Db.Roles.Where(r => roleIds.Contains(r.Id) && r.IsActive).ToListAsync(ct);

@@ -2,7 +2,6 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using SchoolManagementSystem.Application.Interfaces;
-using SchoolManagementSystem.Domain.Constants;
 
 namespace SchoolManagementSystem.Api.Security;
 
@@ -10,12 +9,7 @@ public class PermissionHandler(IPermissionChecker permissionChecker) : Authoriza
 {
     protected override async Task HandleRequirementAsync(AuthorizationHandlerContext context, PermissionRequirement requirement)
     {
-        if (context.User.IsInRole(SystemRoles.SuperAdmin))
-        {
-            context.Succeed(requirement);
-            return;
-        }
-
+        // SuperAdmin is resolved from the database inside the checker (token role claims can be stale).
         var raw = context.User.FindFirstValue(JwtRegisteredClaimNames.Sub)
                   ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!int.TryParse(raw, out var userId))
