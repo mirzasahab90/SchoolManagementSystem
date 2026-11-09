@@ -86,6 +86,39 @@ public class AuthService(
         return await BuildCurrentUserAsync(user, activeCampusId, ct);
     }
 
+    public async Task<Result> ChangePasswordAsync(int userId, ChangePasswordRequest request, CancellationToken ct = default)
+    {
+        var user = await repositories.Users.GetByIdAsync(userId, ct);
+        if (user?.PasswordHash == null || !user.IsActive)
+        {
+            return SessionExpired;
+        }
+
+        if (passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.CurrentPassword ?? string.Empty)
+            == PasswordVerificationResult.Failed)
+        {
+            return Error.Validation("Current password is incorrect.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8)
+        {
+            return Error.Validation("New password must be at least 8 characters.");
+        }
+
+        if (request.NewPassword == request.CurrentPassword)
+        {
+            return Error.Validation("New password must be different from the current one.");
+        }
+
+        user.PasswordHash = passwordHasher.HashPassword(user, request.NewPassword);
+        user.MustChangePassword = false;
+        await repositories.SaveChangesAsync(ct);
+
+        // Other devices are signed out at their next refresh; this tab keeps its access token.
+        await tokenService.RevokeAllAsync(user.Id, ct);
+        return Result.Ok("Password updated.");
+    }
+
     private static string Normalize(string email) => email.Trim().ToLowerInvariant();
 
     private async Task<AuthResult> IssueAsync(User user, int? activeCampusId, CancellationToken ct)

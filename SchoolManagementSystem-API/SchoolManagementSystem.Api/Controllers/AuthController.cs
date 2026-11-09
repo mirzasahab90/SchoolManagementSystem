@@ -56,6 +56,10 @@ public class AuthController(
         return Success<object>(null!, "Signed out.");
     }
 
+    [HttpPost("change-password")]
+    public async Task<ActionResult<ResponseDto<object>>> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken ct) =>
+        FromResult(await authService.ChangePasswordAsync(CurrentUserId, request, ct));
+
     [HttpGet("me")]
     public async Task<ActionResult<ResponseDto<CurrentUserDto>>> Me(CancellationToken ct)
     {

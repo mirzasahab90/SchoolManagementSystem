@@ -11,5 +11,8 @@ public interface IAuthService
 
     Task LogoutAsync(string? refreshToken, CancellationToken ct = default);
 
+    /// <summary>Changes the signed-in user's password, clears MustChangePassword and signs out other sessions.</summary>
+    Task<Result> ChangePasswordAsync(int userId, ChangePasswordRequest request, CancellationToken ct = default);
+
     Task<Result<CurrentUserDto>> GetCurrentUserAsync(int userId, int? activeCampusId, CancellationToken ct = default);
 }

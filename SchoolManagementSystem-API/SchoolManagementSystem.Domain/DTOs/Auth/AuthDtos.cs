@@ -2,6 +2,8 @@ namespace SchoolManagementSystem.Domain.DTOs.Auth;
 
 public record LoginRequest(string Email, string Password);
 
+public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
+
 public record TokenResult(string AccessToken, DateTime AccessExpiresUtc, string RefreshToken, DateTime RefreshExpiresUtc);
 
 public record AuthResult(TokenResult Tokens, CurrentUserDto User);

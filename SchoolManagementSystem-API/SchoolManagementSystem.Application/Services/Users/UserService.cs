@@ -47,7 +47,7 @@ public class UserService(
             Phone = request.Phone?.Trim(),
             IsActive = request.IsActive,
             IsHq = request.IsHq,
-            MustChangePassword = string.IsNullOrWhiteSpace(request.Password)
+            MustChangePassword = request.MustChangePassword || string.IsNullOrWhiteSpace(request.Password)
         };
 
         if (!string.IsNullOrWhiteSpace(request.Password))

@@ -140,6 +140,32 @@ def seed(hq):
           and r["data"].get("effectiveCurrentId") == current["id"], (s, r))
 
 
+# ------------------------------------------------------------------ password
+
+@group
+def password(hq):
+    a, _ = demo_campuses(hq)
+    uid, email, p1 = make_user(hq, campus_ids=[a], role_names=["Teacher"], must_change=True)
+    auth = login(email, p1)
+    check("new user must change password", auth["user"]["mustChangePassword"] is True, auth["user"])
+    t = auth["tokens"]["accessToken"]
+    p2 = temp_password()
+    s, r = call("POST", "/auth/change-password", {"currentPassword": "wrong-" + p1, "newPassword": p2}, token=t)
+    check("wrong current password -> 400", s == 400, (s, r))
+    s, r = call("POST", "/auth/change-password", {"currentPassword": p1, "newPassword": "Ab#1234"}, token=t)
+    check("7-character new password -> 400", s == 400, (s, r))
+    s, r = call("POST", "/auth/change-password", {"currentPassword": p1, "newPassword": p1}, token=t)
+    check("new equal to current -> 400", s == 400, (s, r))
+    s, r = call("POST", "/auth/change-password", {"currentPassword": p1, "newPassword": p2}, token=t)
+    check("change password -> 200", s == 200, (s, r))
+    me = data(call("GET", "/auth/me", token=t))
+    check("flag cleared after change", me and me["mustChangePassword"] is False, me)
+    s, _ = call("POST", "/auth/login", {"email": email, "password": p1})
+    check("old password stops working", s == 401, s)
+    s, _ = call("POST", "/auth/login", {"email": email, "password": p2})
+    check("new password works", s == 200, s)
+
+
 # ------------------------------------------------------------------ runner
 
 def main(argv):

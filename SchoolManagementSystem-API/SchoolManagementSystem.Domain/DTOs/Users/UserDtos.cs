@@ -24,4 +24,5 @@ public record SaveUserRequest(
     bool IsHq,
     IReadOnlyList<int> RoleIds,
     IReadOnlyList<int> CampusIds,
-    string? Password);
+    string? Password,
+    bool MustChangePassword = false);
