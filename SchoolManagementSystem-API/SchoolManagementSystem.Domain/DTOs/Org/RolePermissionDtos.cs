@@ -12,7 +12,10 @@ public record RoleDetailDto(
     string? Description,
     bool IsSystem,
     bool IsActive,
-    IReadOnlyList<ModulePermissionCellDto> Matrix);
+    IReadOnlyList<ModulePermissionCellDto> Matrix,
+    int? CampusId = null,
+    string? CampusCode = null,
+    bool HqAssignOnly = false);
 
 public record SaveRolePermissionsRequest(
     string Name,
@@ -20,4 +23,4 @@ public record SaveRolePermissionsRequest(
     bool IsActive,
     IReadOnlyList<ModulePermissionCellDto> Matrix);
 
-public record CreateRoleRequest(string Name, string? Description);
+public record CreateRoleRequest(string Name, string? Description, int? CampusId = null);

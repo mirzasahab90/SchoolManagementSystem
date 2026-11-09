@@ -166,6 +166,71 @@ def password(hq):
     check("new password works", s == 200, s)
 
 
+# ------------------------------------------------------------------ roles-ownership
+
+def campus_admin(hq, campus_id):
+    """A temporary CampusAdmin for one campus; returns (user_id, token)."""
+    uid, email, pw = make_user(hq, campus_ids=[campus_id], role_names=["CampusAdmin"])
+    return uid, login(email, pw)["tokens"]["accessToken"]
+
+
+def create_role(token, name, campus=None, campus_id=None):
+    body = {"name": name, "description": "temp"}
+    if campus_id is not None:
+        body["campusId"] = campus_id
+    s, r = call("POST", "/roles", body, token=token, campus=campus)
+    if s == 200:
+        track("roles", r["data"]["id"])
+    return s, r
+
+
+@group
+def roles_ownership(hq):
+    a, b = demo_campuses(hq)
+    _, ca = campus_admin(hq, a)
+
+    s, r = create_role(ca, "QA Coach", campus=a)
+    check("campus admin creates a campus role", s == 200 and r["data"].get("campusCode"), (s, r))
+    coach = r["data"]["id"] if s == 200 else None
+    names_b = [x["name"] for x in data(call("GET", "/roles", token=hq, campus=b))]
+    check("campus role hidden on another campus", "QA Coach" not in names_b, names_b)
+    names_all = [x["name"] for x in data(call("GET", "/roles", token=hq))]
+    check("HQ on All campuses sees campus role", "QA Coach" in names_all, names_all)
+
+    teacher = role_id(hq, "Teacher")
+    s, r = call("PUT", f"/roles/{teacher}", {"name": "Teacher", "isActive": True, "matrix": full_matrix(["sections"])}, token=ca, campus=a)
+    check("campus admin cannot edit an HQ role", s == 403, (s, r))
+
+    if coach:
+        s, r = call("PUT", f"/roles/{coach}", {"name": "QA Coach", "isActive": True,
+                                               "matrix": full_matrix(["campuses"])}, token=ca, campus=a)
+        check("cannot grant unheld permission (campuses.delete)", s == 403 and "only grant permissions you have" in str(r), (s, r))
+        s, r = call("PUT", f"/roles/{coach}", {"name": "QA Coach", "isActive": True,
+                                               "matrix": full_matrix(["sections"], edit=False, delete=False)}, token=ca, campus=a)
+        check("can grant held permissions", s == 200, (s, r))
+
+        s, r = call("POST", "/users", user_payload(campus_ids=[a], role_ids=[coach]), token=ca, campus=a)
+        check("campus role assignable to its campus users", s == 200, (s, r))
+        if s == 200:
+            track("users", r["data"]["id"])
+        s, r = call("POST", "/users", user_payload(campus_ids=[a, b], role_ids=[coach]), token=hq)
+        check("campus role refused for user also on another campus", s == 403, (s, r))
+        if s == 200:
+            track("users", r["data"]["id"])
+
+    ca_role = role_id(hq, "CampusAdmin")
+    s, r = call("POST", "/users", user_payload(campus_ids=[a], role_ids=[ca_role]), token=ca, campus=a)
+    check("campus admin cannot assign CampusAdmin", s == 403 and "Only HQ can assign this role." in str(r), (s, r))
+    if s == 200:
+        track("users", r["data"]["id"])
+    assignable = [x["name"] for x in data(call("GET", "/roles?assignable=true", token=ca, campus=a))]
+    check("HQ-only roles not assignable by campus admin", "SuperAdmin" not in assignable and "CampusAdmin" not in assignable
+          and "Teacher" in assignable, assignable)
+
+    s, r = create_role(ca, "Teacher", campus=a)
+    check("campus role cannot shadow an HQ role name", s == 409, (s, r))
+
+
 # ------------------------------------------------------------------ runner
 
 def main(argv):

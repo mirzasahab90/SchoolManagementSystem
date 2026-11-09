@@ -30,8 +30,16 @@ public class RoleRepository(SchoolManagementSystemDbContext dbContext) : BaseRep
             .ThenInclude(p => p.Permission)
             .FirstOrDefaultAsync(r => r.Id == id, ct);
 
-    public Task<bool> NameExistsAsync(string name, int? excludeId, CancellationToken ct = default) =>
-        Db.Roles.AnyAsync(r => r.Name == name && (!excludeId.HasValue || r.Id != excludeId.Value), ct);
+    /// <summary>
+    /// A name is taken when HQ or the same campus already uses it. An HQ role's name must also be
+    /// unused by every campus, so one name never means two different roles.
+    /// </summary>
+    public Task<bool> NameTakenAsync(string name, int? campusId, int? excludeId, CancellationToken ct = default) =>
+        Db.Roles.IgnoreQueryFilters().AnyAsync(r =>
+            !r.IsDeleted
+            && r.Name == name
+            && (!excludeId.HasValue || r.Id != excludeId.Value)
+            && (campusId == null || r.CampusId == null || r.CampusId == campusId), ct);
 
     /// <summary>Leaf menus only (have a route) — group parents like Settings are not permission targets.</summary>
     public Task<List<Module>> GetMenuModulesAsync(CancellationToken ct = default) =>

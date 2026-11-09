@@ -221,6 +221,21 @@ public class UserService(
             return Error.Validation("One or more roles are invalid.");
         }
 
+        if (roles.Any(r => r.HqAssignOnly) && !currentUser.IsHq)
+        {
+            return Error.Forbidden("Only HQ can assign this role.");
+        }
+
+        // A campus role may only go to users of exactly that campus (never HQ users), so its
+        // permissions cannot apply on another campus.
+        foreach (var campusRole in roles.Where(r => r.CampusId != null))
+        {
+            if (request.IsHq || request.CampusIds.Distinct().Count() != 1 || request.CampusIds[0] != campusRole.CampusId)
+            {
+                return Error.Forbidden($"The role '{campusRole.Name}' belongs to one campus and can only be given to users of that campus.");
+            }
+        }
+
         if (request.IsHq && !currentUser.IsHq)
         {
             return Error.Forbidden("Only HQ users can grant HQ access.");

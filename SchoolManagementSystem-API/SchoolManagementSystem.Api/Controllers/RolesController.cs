@@ -12,8 +12,8 @@ public class RolesController(IRoleService roleService) : ApiControllerBase
 {
     [HttpGet]
     [HasPermission(AppModules.Roles, AppActions.View)]
-    public async Task<ActionResult<ResponseDto<IReadOnlyList<RoleListItemDto>>>> List(CancellationToken ct) =>
-        FromResult(await roleService.ListAsync(ct));
+    public async Task<ActionResult<ResponseDto<IReadOnlyList<RoleListItemDto>>>> List([FromQuery] bool assignable, CancellationToken ct) =>
+        FromResult(await roleService.ListAsync(assignable, ct));
 
     [HttpGet("{id:int}")]
     [HasPermission(AppModules.Roles, AppActions.View)]
