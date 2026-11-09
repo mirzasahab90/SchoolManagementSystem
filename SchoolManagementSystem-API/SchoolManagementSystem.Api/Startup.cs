@@ -16,6 +16,7 @@ using SchoolManagementSystem.Api.Security;
 using SchoolManagementSystem.Application.Interfaces;
 using SchoolManagementSystem.Application.Middlewares;
 using SchoolManagementSystem.Application.Repository;
+using SchoolManagementSystem.Application.Services.Academics;
 using SchoolManagementSystem.Application.Services.Auth;
 using SchoolManagementSystem.Application.Services.Dashboard;
 using SchoolManagementSystem.Application.Services.Org;
@@ -63,6 +64,7 @@ public class Startup(IConfiguration configuration, IWebHostEnvironment environme
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<ISchoolService, SchoolService>();
+        services.AddScoped<IAcademicSessionService, AcademicSessionService>();
         services.AddScoped<IDashboardService, DashboardService>();
 
         AddAuthentication(services);
