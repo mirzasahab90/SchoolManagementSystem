@@ -180,6 +180,21 @@ public class UserService(
             }
         }
 
+        if (!currentUser.IsHq && target.Id != currentUser.UserId)
+        {
+            var targetRoleIds = target.UserRoles.Select(r => r.RoleId).ToList();
+            var targetRoles = await repositories.Users.GetRolesByIdsAsync(targetRoleIds, ct);
+            if (targetRoles.Any(r => r.HqAssignOnly))
+            {
+                return Error.Forbidden("Only HQ can change or remove a campus admin.");
+            }
+
+            if (!await WithinMyAccessAsync(targetRoleIds, ct))
+            {
+                return Error.Forbidden("You cannot change a user who has more access than you.");
+            }
+        }
+
         if (!currentUser.IsSuperAdmin && target.Id != currentUser.UserId)
         {
             var targetAccess = await repositories.Access.GetUserAccessAsync(target.Id, ct);
@@ -190,6 +205,16 @@ public class UserService(
         }
 
         return null;
+    }
+
+    /// <summary>True when every permission the roles grant is one the current user holds.</summary>
+    private async Task<bool> WithinMyAccessAsync(IEnumerable<int> roleIds, CancellationToken ct)
+    {
+        if (currentUser.UserId is not int actorId) return false;
+        var mine = await repositories.Access.GetUserAccessAsync(actorId, ct);
+        if (mine.IsSuperAdmin) return true;
+        var grants = await repositories.Roles.GetGrantsAsync(roleIds, ct);
+        return grants.All(g => mine.Can(g.Module, g.Action));
     }
 
     private async Task<Error?> ValidateAsync(SaveUserRequest request, int? excludeId, CancellationToken ct)
@@ -224,6 +249,12 @@ public class UserService(
         if (roles.Any(r => r.HqAssignOnly) && !currentUser.IsHq)
         {
             return Error.Forbidden("Only HQ can assign this role.");
+        }
+
+        // No escalation: outside HQ, the roles given must not carry permissions the editor lacks.
+        if (!currentUser.IsHq && !await WithinMyAccessAsync(request.RoleIds, ct))
+        {
+            return Error.Forbidden("You can only grant permissions you have.");
         }
 
         // A campus role may only go to users of exactly that campus (never HQ users), so its

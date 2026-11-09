@@ -97,7 +97,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const changePassword = useCallback(
     async (current: string, next: string) => {
-      await unwrap(api.post("/auth/change-password", { currentPassword: current, newPassword: next }));
+      // The server signs out other sessions and hands this device fresh tokens.
+      const result = (await unwrap(
+        api.post("/auth/change-password", { currentPassword: current, newPassword: next }),
+      )) as AuthResult;
+      tokenStore.setAccess(result.tokens.accessToken);
       await refreshMe();
     },
     [refreshMe],

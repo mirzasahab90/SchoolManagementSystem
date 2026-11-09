@@ -86,7 +86,7 @@ public class AuthService(
         return await BuildCurrentUserAsync(user, activeCampusId, ct);
     }
 
-    public async Task<Result> ChangePasswordAsync(int userId, ChangePasswordRequest request, CancellationToken ct = default)
+    public async Task<Result<AuthResult>> ChangePasswordAsync(int userId, ChangePasswordRequest request, CancellationToken ct = default)
     {
         var user = await repositories.Users.GetByIdAsync(userId, ct);
         if (user?.PasswordHash == null || !user.IsActive)
@@ -114,9 +114,9 @@ public class AuthService(
         user.MustChangePassword = false;
         await repositories.SaveChangesAsync(ct);
 
-        // Other devices are signed out at their next refresh; this tab keeps its access token.
+        // Every existing refresh token (other devices) stops working; this device gets fresh tokens.
         await tokenService.RevokeAllAsync(user.Id, ct);
-        return Result.Ok("Password updated.");
+        return await IssueAsync(user, null, ct);
     }
 
     private static string Normalize(string email) => email.Trim().ToLowerInvariant();

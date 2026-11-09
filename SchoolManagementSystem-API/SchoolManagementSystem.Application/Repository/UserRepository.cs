@@ -46,14 +46,23 @@ public class UserRepository(SchoolManagementSystemDbContext dbContext) : BaseRep
                 u.IsActive,
                 u.IsHq,
                 u.LastLoginOn,
-                Roles = u.UserRoles.Select(ur => new RoleRefDto(ur.RoleId, ur.Role.Name)).ToList(),
+                RoleIds = u.UserRoles.Select(ur => ur.RoleId).ToList(),
                 CampusIds = u.UserCampuses.Select(uc => uc.CampusId).ToList()
             })
             .ToListAsync(ct);
 
+        // Role names are read without the ownership filter: hiding a role here would make an editor
+        // drop it on save. Names of other campuses' roles are not sensitive.
+        var roleIds = users.SelectMany(u => u.RoleIds).Distinct().ToList();
+        var roleNames = await Db.Roles.IgnoreQueryFilters().AsNoTracking()
+            .Where(r => roleIds.Contains(r.Id) && !r.IsDeleted)
+            .ToDictionaryAsync(r => r.Id, r => r.Name, ct);
+
         return users.Select(u => new UserListItemDto(
             u.Id, u.FirstName, u.LastName, $"{u.FirstName} {u.LastName}".Trim(),
-            u.Email, u.Phone, u.IsActive, u.IsHq, u.LastLoginOn, u.Roles, u.CampusIds)).ToList();
+            u.Email, u.Phone, u.IsActive, u.IsHq, u.LastLoginOn,
+            u.RoleIds.Where(roleNames.ContainsKey).Select(id => new RoleRefDto(id, roleNames[id])).ToList(),
+            u.CampusIds)).ToList();
     }
 
     public async Task<UserListItemDto?> GetListItemAsync(int id, IReadOnlySet<int>? campusIds = null, CancellationToken ct = default) =>
@@ -79,8 +88,12 @@ public class UserRepository(SchoolManagementSystemDbContext dbContext) : BaseRep
     public Task<int> CountActiveAsync(IReadOnlyCollection<int>? campusIds = null, CancellationToken ct = default) =>
         Db.Users.CountAsync(u => u.IsActive && (campusIds == null || u.UserCampuses.Any(uc => campusIds.Contains(uc.CampusId))), ct);
 
+    /// <summary>
+    /// Roles by id regardless of the request's campus view (a user may hold another campus's role the editor
+    /// cannot see). Callers enforce who may assign which role.
+    /// </summary>
     public Task<List<Role>> GetRolesByIdsAsync(IEnumerable<int> roleIds, CancellationToken ct = default) =>
-        Db.Roles.Where(r => roleIds.Contains(r.Id) && r.IsActive).ToListAsync(ct);
+        Db.Roles.IgnoreQueryFilters().Where(r => roleIds.Contains(r.Id) && r.IsActive && !r.IsDeleted).ToListAsync(ct);
 
     public void ReplaceRoles(User user, IEnumerable<int> roleIds, int? assignedBy)
     {

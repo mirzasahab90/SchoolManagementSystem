@@ -57,8 +57,17 @@ public class AuthController(
     }
 
     [HttpPost("change-password")]
-    public async Task<ActionResult<ResponseDto<object>>> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken ct) =>
-        FromResult(await authService.ChangePasswordAsync(CurrentUserId, request, ct));
+    public async Task<ActionResult<ResponseDto<AuthResult>>> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken ct)
+    {
+        var result = await authService.ChangePasswordAsync(CurrentUserId, request, ct);
+        if (!result.IsSuccess)
+        {
+            return Failure<AuthResult>(result.Error!);
+        }
+
+        refreshCookie.Set(Response, result.Value!.Tokens.RefreshToken, result.Value.Tokens.RefreshExpiresUtc);
+        return Success(result.Value, "Password updated.");
+    }
 
     [HttpGet("me")]
     public async Task<ActionResult<ResponseDto<CurrentUserDto>>> Me(CancellationToken ct)

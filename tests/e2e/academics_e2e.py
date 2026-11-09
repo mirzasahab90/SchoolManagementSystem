@@ -596,6 +596,58 @@ def dashboard(hq):
     check("academics KPI count follows the campus", ka and ka["hint"] == f"{count_a} sections", (ka, count_a))
 
 
+# ------------------------------------------------------------------ review-fixes (final review findings)
+
+@group
+def review_fixes(hq):
+    a, b = demo_campuses(hq)
+    principal = role_id(hq, "Principal")
+
+    # 1. A Clerk (users View+Add) must not hand out a role stronger than their own.
+    _, email, pw = make_user(hq, campus_ids=[a], role_names=["Clerk"])
+    clerk = login(email, pw)["tokens"]["accessToken"]
+    s, r = call("POST", "/users", user_payload(campus_ids=[a], role_ids=[principal]), token=clerk, campus=a)
+    check("clerk cannot assign a stronger role (Principal)", s == 403, (s, r))
+    if s == 200:
+        track("users", r["data"]["id"])
+
+    # 2. Saving a user must not drop campus roles the editor cannot see.
+    _, cb = campus_admin(hq, b)
+    s, r = create_role(cb, "QB Helper", campus=b)
+    helper = r["data"]["id"] if s == 200 else None
+    if helper:
+        call("PUT", f"/roles/{helper}", {"name": "QB Helper", "isActive": True,
+                                          "matrix": full_matrix(["sections"], add=False, edit=False, delete=False)}, token=cb, campus=b)
+        uid, _, _ = make_user(cb, campus_ids=[b], role_ids=[helper, role_id(hq, "Teacher")], campus=b)
+        listed = data(call("GET", f"/users/{uid}", token=hq, campus=a))
+        body = user_payload(campus_ids=listed["campusIds"], role_ids=[x["id"] for x in listed["roles"]], email=listed["email"])
+        body["password"] = None
+        s, r = call("PUT", f"/users/{uid}", body, token=hq, campus=a)
+        after = data(call("GET", f"/users/{uid}", token=hq))
+        check("HQ edit with another campus selected keeps hidden campus role", s == 200
+              and helper in [x["id"] for x in after["roles"]], (s, r, after and after["roles"]))
+
+    # 3. A Principal must not demote or delete the Campus Admin.
+    ca_id, _ = campus_admin(hq, a)
+    _, pemail, ppw = make_user(hq, campus_ids=[a], role_names=["Principal"])
+    pt = login(pemail, ppw)["tokens"]["accessToken"]
+    target = data(call("GET", f"/users/{ca_id}", token=hq))
+    body = user_payload(campus_ids=[a], role_ids=[role_id(hq, "Teacher")], email=target["email"])
+    body["password"] = None
+    s, r = call("PUT", f"/users/{ca_id}", body, token=pt, campus=a)
+    check("principal cannot demote the campus admin", s == 403, (s, r))
+    s, r = call("DELETE", f"/users/{ca_id}", token=pt, campus=a)
+    check("principal cannot delete the campus admin", s == 403, (s, r))
+
+    # 4. Changing password keeps this device signed in with fresh tokens.
+    _, temail, tpw = make_user(hq, campus_ids=[a], role_names=["Teacher"])
+    tt = login(temail, tpw)["tokens"]["accessToken"]
+    s, r = call("POST", "/auth/change-password", {"currentPassword": tpw, "newPassword": temp_password()}, token=tt)
+    fresh = (r.get("data") or {}).get("tokens", {}).get("accessToken") if isinstance(r, dict) else None
+    check("change-password returns fresh tokens for this device", s == 200 and fresh
+          and call("GET", "/auth/me", token=fresh)[0] == 200, (s, r))
+
+
 # ------------------------------------------------------------------ runner
 
 def main(argv):

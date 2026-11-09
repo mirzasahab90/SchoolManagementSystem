@@ -60,6 +60,17 @@ public class RoleRepository(SchoolManagementSystemDbContext dbContext) : BaseRep
     public Task<bool> UserHasRoleAsync(int userId, int roleId, CancellationToken ct = default) =>
         Db.UserRoles.AsNoTracking().AnyAsync(ur => ur.UserId == userId && ur.RoleId == roleId, ct);
 
+    /// <summary>(module key, action) pairs granted by the given roles, ignoring campus view.</summary>
+    public async Task<List<(string Module, string Action)>> GetGrantsAsync(IEnumerable<int> roleIds, CancellationToken ct = default)
+    {
+        var ids = roleIds.ToList();
+        var rows = await Db.RoleModulePermissions.AsNoTracking().IgnoreQueryFilters()
+            .Where(x => ids.Contains(x.RoleId) && !x.Role.IsDeleted && x.Role.IsActive)
+            .Select(x => new { x.Module.Key, x.Permission.Code })
+            .ToListAsync(ct);
+        return rows.Select(x => (x.Key, x.Code)).ToList();
+    }
+
     public Task<int?> GetHqRoleIdAsync(string name, CancellationToken ct = default) =>
         Db.Roles.IgnoreQueryFilters()
             .Where(r => !r.IsDeleted && r.CampusId == null && r.Name == name)
