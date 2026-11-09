@@ -27,10 +27,14 @@ public class DashboardService(
             activeCampusName = (await repositories.Campuses.GetDtoAsync(campusId, ct))?.Name;
         }
 
+        var current = await repositories.Sessions.GetEffectiveCurrentAsync(currentUser.ActiveCampusId, ct);
+        var sectionCount = current == null ? 0 : await repositories.Sections.CountAsync(current.Id, ct);
+
         var scopeLabel = activeCampusName ?? (currentUser.IsHq ? "All campuses" : "No campus selected");
         var kpis = new List<KpiCardDto>
         {
             new("campuses", "Campuses", campuses.ToString(), $"{activeCampuses} active", "primary", "/admin/campuses"),
+            new("academics", "Current session", current?.Name ?? "Not set", $"{sectionCount} sections", "primary", "/admin/academics/sections"),
             new("users", "Users", users.ToString(), $"{activeUsers} active logins", "neutral", "/admin/users"),
             new("roles", "Roles", roles.ToString(), "Permission templates", "neutral", "/admin/roles"),
             new("hq", "Access mode", currentUser.IsHq ? "HQ" : "Campus", scopeLabel, "primary", null),

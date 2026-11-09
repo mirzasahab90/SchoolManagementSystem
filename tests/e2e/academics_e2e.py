@@ -580,6 +580,22 @@ def sections(hq):
         call("PUT", f"/academic-sessions/{target}", session_body("QA-COPY", "2098-04-01", "2099-03-31", "Planned"), token=hq)
 
 
+# ------------------------------------------------------------------ dashboard
+
+@group
+def dashboard(hq):
+    import re as _re
+    a, _ = demo_campuses(hq)
+    kpis = data(call("GET", "/dashboard", token=hq))["kpis"]
+    k = next((x for x in kpis if x["id"] == "academics"), None)
+    check("academics KPI for HQ", k and k["value"] == "2026-27" and _re.fullmatch(r"\d+ sections", k.get("hint") or "")
+          and k.get("href") == "/admin/academics/sections", k)
+    kpis_a = data(call("GET", "/dashboard", token=hq, campus=a))["kpis"]
+    ka = next((x for x in kpis_a if x["id"] == "academics"), None)
+    count_a = len(data(call("GET", "/sections", token=hq, campus=a)))
+    check("academics KPI count follows the campus", ka and ka["hint"] == f"{count_a} sections", (ka, count_a))
+
+
 # ------------------------------------------------------------------ runner
 
 def main(argv):
