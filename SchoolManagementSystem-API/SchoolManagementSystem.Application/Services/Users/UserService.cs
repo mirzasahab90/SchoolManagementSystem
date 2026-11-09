@@ -10,21 +10,23 @@ using SchoolManagementSystem.Domain.Entities.Org;
 
 namespace SchoolManagementSystem.Application.Services.Users;
 
+/// <summary>
+/// HQ users manage everyone except SuperAdmins (only a SuperAdmin manages those).
+/// Campus users manage only non-HQ users whose campuses all lie within their own campuses,
+/// and cannot grant HQ access, foreign campuses, or change their own roles / campuses.
+/// </summary>
 public class UserService(
     SchoolManagementSystemRepositories repositories,
     IPasswordHasher<User> passwordHasher,
     ICurrentUser currentUser,
     IPermissionChecker permissionChecker) : IUserService
 {
-    public async Task<Result<IReadOnlyList<UserListItemDto>>> ListAsync(CancellationToken ct = default)
-    {
-        var list = await repositories.Users.ListAsync(ct);
-        return list;
-    }
+    public async Task<Result<IReadOnlyList<UserListItemDto>>> ListAsync(CancellationToken ct = default) =>
+        await repositories.Users.ListAsync(currentUser.ManageableCampusIds, null, ct);
 
     public async Task<Result<UserListItemDto>> GetAsync(int id, CancellationToken ct = default)
     {
-        var item = await repositories.Users.GetListItemAsync(id, ct);
+        var item = await repositories.Users.GetListItemAsync(id, currentUser.ManageableCampusIds, ct);
         return item is null ? Error.NotFound("User") : item;
     }
 
@@ -88,15 +90,31 @@ public class UserService(
             return Error.NotFound("User");
         }
 
+        var targetError = await GuardTargetAsync(user, ct);
+        if (targetError != null)
+        {
+            return targetError;
+        }
+
         var validation = await ValidateAsync(request, id, ct);
         if (validation != null)
         {
             return validation;
         }
 
-        if (id == currentUser.UserId && !request.IsActive)
+        if (id == currentUser.UserId)
         {
-            return Error.Validation("You cannot deactivate your own account.");
+            if (!request.IsActive)
+            {
+                return Error.Validation("You cannot deactivate your own account.");
+            }
+
+            var sameRoles = user.UserRoles.Select(r => r.RoleId).ToHashSet().SetEquals(request.RoleIds);
+            var sameCampuses = user.UserCampuses.Select(c => c.CampusId).ToHashSet().SetEquals(request.CampusIds);
+            if (!currentUser.IsSuperAdmin && (!sameRoles || !sameCampuses || user.IsHq != request.IsHq))
+            {
+                return Error.Forbidden("You cannot change your own roles, campuses or HQ access.");
+            }
         }
 
         user.FirstName = request.FirstName.Trim();
@@ -126,16 +144,52 @@ public class UserService(
             return Error.Validation("You cannot delete your own account.");
         }
 
-        var user = await repositories.Users.GetByIdAsync(id, ct);
+        var user = await repositories.Users.GetWithRolesAndCampusesAsync(id, ct);
         if (user == null)
         {
             return Error.NotFound("User");
+        }
+
+        var targetError = await GuardTargetAsync(user, ct);
+        if (targetError != null)
+        {
+            return targetError;
         }
 
         repositories.Users.Remove(user);
         await repositories.SaveChangesAsync(ct);
         permissionChecker.Invalidate();
         return Result.Ok("User deleted.");
+    }
+
+    /// <summary>May the current user change or delete this existing user?</summary>
+    private async Task<Error?> GuardTargetAsync(User target, CancellationToken ct)
+    {
+        if (!currentUser.IsHq)
+        {
+            var allowed = currentUser.AssignedCampusIds;
+            var visible = !target.IsHq && target.UserCampuses.Any(c => allowed.Contains(c.CampusId));
+            if (!visible)
+            {
+                return Error.NotFound("User");
+            }
+
+            if (target.UserCampuses.Any(c => !allowed.Contains(c.CampusId)))
+            {
+                return Error.Forbidden("This user also belongs to campuses you do not manage. Ask HQ to change them.");
+            }
+        }
+
+        if (!currentUser.IsSuperAdmin && target.Id != currentUser.UserId)
+        {
+            var targetAccess = await repositories.Access.GetUserAccessAsync(target.Id, ct);
+            if (targetAccess.IsSuperAdmin)
+            {
+                return Error.Forbidden("Only a SuperAdmin can change another SuperAdmin.");
+            }
+        }
+
+        return null;
     }
 
     private async Task<Error?> ValidateAsync(SaveUserRequest request, int? excludeId, CancellationToken ct)
@@ -167,6 +221,11 @@ public class UserService(
             return Error.Validation("One or more roles are invalid.");
         }
 
+        if (request.IsHq && !currentUser.IsHq)
+        {
+            return Error.Forbidden("Only HQ users can grant HQ access.");
+        }
+
         if (!request.IsHq && request.CampusIds.Count == 0)
         {
             return Error.Validation("Assign at least one campus, or mark the user as HQ.");
@@ -174,11 +233,16 @@ public class UserService(
 
         if (request.CampusIds.Count > 0)
         {
-            var campuses = await repositories.Campuses.ListAsync(ct);
+            var campuses = await repositories.Campuses.ListAsync(null, ct);
             var valid = campuses.Select(c => c.Id).ToHashSet();
             if (request.CampusIds.Any(id => !valid.Contains(id)))
             {
                 return Error.Validation("One or more campuses are invalid.");
+            }
+
+            if (request.CampusIds.Any(id => !currentUser.CanAccessCampus(id)))
+            {
+                return Error.Forbidden("You can only assign campuses you have access to.");
             }
         }
 
@@ -187,20 +251,14 @@ public class UserService(
             return Error.Validation("Password is required for new users.");
         }
 
-        if (!string.IsNullOrWhiteSpace(request.Password) && request.Password.Length < 6)
+        if (!string.IsNullOrWhiteSpace(request.Password) && request.Password.Length < 8)
         {
-            return Error.Validation("Password must be at least 6 characters.");
+            return Error.Validation("Password must be at least 8 characters.");
         }
 
-        // Only SuperAdmin may assign SuperAdmin role.
-        var assigningSuperAdmin = roles.Any(r => r.Name == SystemRoles.SuperAdmin);
-        if (assigningSuperAdmin && currentUser.UserId is int actorId)
+        if (roles.Any(r => r.Name == SystemRoles.SuperAdmin) && !currentUser.IsSuperAdmin)
         {
-            var actorAccess = await repositories.Access.GetUserAccessAsync(actorId, ct);
-            if (!actorAccess.IsSuperAdmin)
-            {
-                return Error.Forbidden("Only SuperAdmin can assign the SuperAdmin role.");
-            }
+            return Error.Forbidden("Only SuperAdmin can assign the SuperAdmin role.");
         }
 
         return null;

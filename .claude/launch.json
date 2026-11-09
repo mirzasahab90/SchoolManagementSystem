@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "SchoolManagementSystem-API/SchoolManagementSystem.Api",
+        "--urls",
+        "https://localhost:7150;http://localhost:5150"
+      ],
+      "port": 5150
+    },
+    {
+      "name": "ui",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "SchoolManagementSystem-UI", "run", "dev"],
+      "port": 5173
+    }
+  ]
+}

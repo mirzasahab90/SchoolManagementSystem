@@ -1,25 +1,31 @@
 using SchoolManagementSystem.Application.Interfaces;
 using SchoolManagementSystem.Application.Repository;
+using SchoolManagementSystem.Domain.Abstractions;
 using SchoolManagementSystem.Domain.Common;
 using SchoolManagementSystem.Domain.DTOs.Org;
 using SchoolManagementSystem.Domain.Entities.Org;
 
 namespace SchoolManagementSystem.Application.Services.Org;
 
-public class CampusService(SchoolManagementSystemRepositories repositories) : ICampusService
+/// <summary>
+/// HQ manages every campus (create / delete included). Campus users see and edit only their own campuses.
+/// </summary>
+public class CampusService(SchoolManagementSystemRepositories repositories, ICurrentUser currentUser) : ICampusService
 {
     public async Task<Result<IReadOnlyList<CampusDto>>> ListAsync(CancellationToken ct = default) =>
-        await repositories.Campuses.ListAsync(ct);
+        await repositories.Campuses.ListAsync(currentUser.ManageableCampusIds, ct);
 
     public async Task<Result<CampusDto>> GetAsync(int id, CancellationToken ct = default)
     {
-        var list = await repositories.Campuses.ListAsync(ct);
-        var campus = list.FirstOrDefault(c => c.Id == id);
+        if (!currentUser.CanAccessCampus(id)) return Error.NotFound("Campus");
+        var campus = await repositories.Campuses.GetDtoAsync(id, ct);
         return campus is null ? Error.NotFound("Campus") : campus;
     }
 
     public async Task<Result<CampusDto>> CreateAsync(SaveCampusRequest request, CancellationToken ct = default)
     {
+        if (!currentUser.IsHq) return Error.Forbidden("Only HQ users can add campuses.");
+
         var validation = Validate(request);
         if (validation != null) return validation;
 
@@ -39,6 +45,8 @@ public class CampusService(SchoolManagementSystemRepositories repositories) : IC
 
     public async Task<Result<CampusDto>> UpdateAsync(int id, SaveCampusRequest request, CancellationToken ct = default)
     {
+        if (!currentUser.CanAccessCampus(id)) return Error.NotFound("Campus");
+
         var validation = Validate(request);
         if (validation != null) return validation;
 
@@ -46,8 +54,22 @@ public class CampusService(SchoolManagementSystemRepositories repositories) : IC
         if (campus == null) return Error.NotFound("Campus");
 
         var code = request.Code.Trim().ToUpperInvariant();
+        if (!currentUser.IsHq)
+        {
+            // Campus staff may update details, but not the code or whether the campus is active.
+            if (!string.Equals(code, campus.Code, StringComparison.Ordinal) || request.IsActive != campus.IsActive)
+                return Error.Forbidden("Only HQ users can change a campus code or status.");
+        }
+
         if (await repositories.Campuses.CodeExistsAsync(code, id, ct))
             return Error.Conflict($"Campus code '{code}' already exists.");
+
+        if (campus.IsActive && !request.IsActive)
+        {
+            var stranded = await repositories.Campuses.CountUsersOnlyInCampusAsync(id, ct);
+            if (stranded > 0)
+                return Error.Validation($"{stranded} user(s) have access to this campus only. Assign them another campus first.");
+        }
 
         Apply(campus, code, request);
         await repositories.SaveChangesAsync(ct);
@@ -56,8 +78,15 @@ public class CampusService(SchoolManagementSystemRepositories repositories) : IC
 
     public async Task<Result> DeleteAsync(int id, CancellationToken ct = default)
     {
+        if (!currentUser.IsHq) return Error.Forbidden("Only HQ users can delete campuses.");
+
         var campus = await repositories.Campuses.GetTrackedAsync(id, ct);
         if (campus == null) return Error.NotFound("Campus");
+
+        var stranded = await repositories.Campuses.CountUsersOnlyInCampusAsync(id, ct);
+        if (stranded > 0)
+            return Error.Validation($"{stranded} user(s) have access to this campus only. Assign them another campus first.");
+
         repositories.Campuses.Remove(campus);
         await repositories.SaveChangesAsync(ct);
         return Result.Ok("Campus deleted.");

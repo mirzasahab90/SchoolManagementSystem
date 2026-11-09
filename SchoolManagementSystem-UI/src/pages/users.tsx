@@ -1,19 +1,28 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Plus } from "lucide-react";
+import { Pencil, Plus, Trash2, Users as UsersIcon } from "lucide-react";
 import { toast } from "sonner";
-import { Modal } from "@/components/modal";
+import { ConfirmDialog, Modal } from "@/components/modal";
 import {
+  Avatar,
   Btn,
+  ChoiceCard,
   DataTable,
   EmptyState,
   Field,
+  FormSection,
+  IconButton,
   PageHeader,
   Panel,
   SearchField,
-  SectionLabel,
+  Select,
   StatusPill,
+  Switch,
+  TableSkeleton,
+  Td,
   TextInput,
+  THead,
   Toolbar,
+  Tr,
 } from "@/components/sms-ui";
 import { useAuth } from "@/lib/auth";
 import { api, unwrap } from "@/lib/api";
@@ -31,8 +40,24 @@ const emptyForm: SaveUserRequest = {
   password: "",
 };
 
+type StatusFilter = "all" | "active" | "inactive";
+
+function formatLastLogin(value?: string | null) {
+  if (!value) return "Never";
+  const date = new Date(value.endsWith("Z") ? value : `${value}Z`);
+  const diff = Date.now() - date.getTime();
+  const minutes = Math.round(diff / 60000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  const days = Math.round(hours / 24);
+  if (days < 30) return `${days} d ago`;
+  return date.toLocaleDateString();
+}
+
 export function UsersPage() {
-  const { can } = useAuth();
+  const { can, user: me } = useAuth();
   const [items, setItems] = useState<UserListItem[]>([]);
   const [roles, setRoles] = useState<RoleListItem[]>([]);
   const [campuses, setCampuses] = useState<Campus[]>([]);
@@ -40,8 +65,11 @@ export function UsersPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<StatusFilter>("all");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<UserListItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -67,18 +95,22 @@ export function UsersPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((u) =>
-      [u.fullName, u.email, u.roles.map((r) => r.name).join(" ")]
-        .join(" ")
-        .toLowerCase()
-        .includes(q),
-    );
-  }, [items, query]);
+    return items.filter((u) => {
+      if (status === "active" && !u.isActive) return false;
+      if (status === "inactive" && u.isActive) return false;
+      if (!q) return true;
+      return [u.fullName, u.email, u.roles.map((r) => r.name).join(" ")].join(" ").toLowerCase().includes(q);
+    });
+  }, [items, query, status]);
+
+  // Only a SuperAdmin may hand out the SuperAdmin role.
+  const assignableRoles = roles.filter((r) => r.name !== "SuperAdmin" || me?.isSuperAdmin);
+  const editingSelf = editingId != null && editingId === me?.id;
+  const lockAccess = editingSelf && !me?.isSuperAdmin;
 
   function openCreate() {
     setEditingId(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, campusIds: me?.activeCampusId ? [me.activeCampusId] : [] });
     setOpen(true);
   }
 
@@ -134,118 +166,158 @@ export function UsersPage() {
     }
   }
 
-  async function remove(id: number) {
-    if (!confirm("Delete this user?")) return;
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    setDeleting(true);
     try {
-      await unwrap(api.delete(`/users/${id}`));
+      await unwrap(api.delete(`/users/${pendingDelete.id}`));
       toast.success("User deleted");
+      setPendingDelete(null);
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setDeleting(false);
     }
   }
 
-  const campusName = (ids: number[]) =>
-    ids
-      .map((id) => campuses.find((c) => c.id === id)?.code)
-      .filter(Boolean)
-      .join(", ") || "—";
+  const campusCodes = (ids: number[]) => ids.map((id) => campuses.find((c) => c.id === id)?.code).filter(Boolean) as string[];
+  const activeCount = items.filter((u) => u.isActive).length;
 
   return (
     <div>
       <PageHeader
         title="Users"
-        description="Create HQ / campus admin logins, assign a role, and choose which campuses they can access. Menus come from the role’s permissions."
+        description="Logins for head office and campus staff. Roles decide what they can do; campuses decide where."
         actions={
           can("users", "Add") ? (
             <Btn type="button" onClick={openCreate}>
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus />
               Add user
             </Btn>
           ) : null
         }
       />
 
-      <Panel>
+      <Panel flush>
         <Toolbar>
-          <SearchField value={query} onChange={setQuery} placeholder="Search name, email, role…" />
-          <div className="text-sm text-[var(--muted-foreground)]">
-            {filtered.length} of {items.length}
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <SearchField value={query} onChange={setQuery} placeholder="Search name, email or role" />
+            <Select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as StatusFilter)}
+              aria-label="Filter by status"
+              className="w-auto"
+            >
+              <option value="all">All statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </Select>
+          </div>
+          <div className="text-xs text-[var(--muted-foreground)]">
+            <span className="tabular font-medium text-[var(--foreground)]">{items.length}</span> users ·{" "}
+            <span className="tabular">{activeCount}</span> active
           </div>
         </Toolbar>
 
         {loading ? (
-          <div className="text-sm text-[var(--muted-foreground)]">Loading…</div>
+          <TableSkeleton cols={5} />
         ) : filtered.length === 0 ? (
           <EmptyState
-            title={items.length === 0 ? "No users yet" : "No matches"}
+            icon={UsersIcon}
+            title={items.length === 0 ? "No users yet" : "No matching users"}
             description={
-              items.length === 0
-                ? "Add an admin user and assign campus access."
-                : "Try a different search."
+              items.length === 0 ? "Add a login and choose the campuses it can work in." : "Try a different search or filter."
+            }
+            action={
+              items.length === 0 && can("users", "Add") ? (
+                <Btn type="button" onClick={openCreate}>
+                  <Plus />
+                  Add user
+                </Btn>
+              ) : null
             }
           />
         ) : (
           <DataTable>
-            <thead className="bg-[var(--muted)] text-xs uppercase tracking-wide text-[var(--muted-foreground)]">
-              <tr>
-                <th className="px-4 py-3">User</th>
-                <th className="px-4 py-3">Role</th>
-                <th className="px-4 py-3">Campuses</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
+            <THead
+              columns={[
+                { label: "User" },
+                { label: "Roles" },
+                { label: "Campus access" },
+                { label: "Last sign-in" },
+                { label: "Status" },
+                { label: "Actions", align: "right" },
+              ]}
+            />
             <tbody>
-              {filtered.map((user) => (
-                <tr key={user.id} className="border-t border-[var(--border)]">
-                  <td className="px-4 py-3">
-                    <div className="font-medium">{user.fullName}</div>
-                    <div className="text-xs text-[var(--muted-foreground)]">{user.email}</div>
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    <div className="flex flex-wrap gap-1">
-                      {user.roles.length
-                        ? user.roles.map((r) => (
-                            <StatusPill key={r.id} tone="info">
-                              {r.name}
-                            </StatusPill>
-                          ))
-                        : "—"}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    {user.isHq ? (
-                      <StatusPill tone="info" dot>
-                        HQ · all campuses
+              {filtered.map((user) => {
+                const codes = campusCodes(user.campusIds);
+                return (
+                  <Tr key={user.id}>
+                    <Td>
+                      <div className="flex items-center gap-3">
+                        <Avatar name={user.fullName} />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 font-medium">
+                            <span className="truncate">{user.fullName}</span>
+                            {user.id === me?.id ? <StatusPill tone="primary">You</StatusPill> : null}
+                          </div>
+                          <div className="truncate text-xs text-[var(--muted-foreground)]">{user.email}</div>
+                        </div>
+                      </div>
+                    </Td>
+                    <Td>
+                      <div className="flex flex-wrap gap-1">
+                        {user.roles.length ? user.roles.map((r) => <StatusPill key={r.id}>{r.name}</StatusPill>) : "—"}
+                      </div>
+                    </Td>
+                    <Td>
+                      {user.isHq ? (
+                        <StatusPill tone="info" dot>
+                          All campuses (HQ)
+                        </StatusPill>
+                      ) : codes.length ? (
+                        <div className="flex flex-wrap gap-1">
+                          {codes.slice(0, 3).map((code) => (
+                            <span
+                              key={code}
+                              className="rounded-md border border-[var(--border)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--muted-foreground)]"
+                            >
+                              {code}
+                            </span>
+                          ))}
+                          {codes.length > 3 ? (
+                            <span className="text-xs text-[var(--muted-foreground)]">+{codes.length - 3}</span>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <span className="text-[var(--muted-foreground)]">—</span>
+                      )}
+                    </Td>
+                    <Td className="text-[var(--muted-foreground)]">{formatLastLogin(user.lastLoginOn)}</Td>
+                    <Td>
+                      <StatusPill tone={user.isActive ? "success" : "neutral"} dot>
+                        {user.isActive ? "Active" : "Inactive"}
                       </StatusPill>
-                    ) : (
-                      campusName(user.campusIds)
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusPill tone={user.isActive ? "success" : "neutral"} dot>
-                      {user.isActive ? "Active" : "Inactive"}
-                    </StatusPill>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {can("users", "Edit") ? (
-                      <button
-                        type="button"
-                        className="mr-3 text-[var(--primary)]"
-                        onClick={() => openEdit(user)}
-                      >
-                        Edit
-                      </button>
-                    ) : null}
-                    {can("users", "Delete") ? (
-                      <button type="button" className="text-red-600" onClick={() => remove(user.id)}>
-                        Delete
-                      </button>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
+                    </Td>
+                    <Td align="right">
+                      <div className="flex justify-end gap-0.5">
+                        {can("users", "Edit") ? (
+                          <IconButton label={`Edit ${user.fullName}`} onClick={() => openEdit(user)}>
+                            <Pencil />
+                          </IconButton>
+                        ) : null}
+                        {can("users", "Delete") && user.id !== me?.id ? (
+                          <IconButton label={`Delete ${user.fullName}`} tone="danger" onClick={() => setPendingDelete(user)}>
+                            <Trash2 />
+                          </IconButton>
+                        ) : null}
+                      </div>
+                    </Td>
+                  </Tr>
+                );
+              })}
             </tbody>
           </DataTable>
         )}
@@ -254,116 +326,128 @@ export function UsersPage() {
       <Modal
         open={open}
         wide
-        title={editingId ? "Edit user" : "Add admin user"}
-        description="Login + role + campus access. Menu visibility follows the role’s permission matrix."
+        title={editingId ? "Edit user" : "Add user"}
+        description="Profile, sign-in, roles and campus access."
         onClose={() => setOpen(false)}
         footer={
           <>
-            <Btn type="button" variant="ghost" onClick={() => setOpen(false)}>
+            <Btn type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Btn>
             <Btn type="submit" form="user-form" disabled={saving}>
-              {saving ? "Saving…" : editingId ? "Update" : "Create"}
+              {saving ? "Saving…" : editingId ? "Save changes" : "Create user"}
             </Btn>
           </>
         }
       >
-        <form id="user-form" className="space-y-4" onSubmit={onSubmit}>
-          <SectionLabel>Profile</SectionLabel>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="First name">
-              <TextInput
-                value={form.firstName}
-                onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-                required
-              />
-            </Field>
-            <Field label="Last name">
-              <TextInput
-                value={form.lastName}
-                onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-                required
-              />
-            </Field>
-          </div>
-          <Field label="Email">
-            <TextInput
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              required
-            />
-          </Field>
-          <Field label="Phone">
-            <TextInput value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          </Field>
-          <Field label={editingId ? "Password (leave blank to keep)" : "Password"}>
-            <TextInput
-              type="password"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              required={!editingId}
-            />
-          </Field>
-
-          <SectionLabel>Role</SectionLabel>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {roles.map((role) => (
-              <label
-                key={role.id}
-                className="flex items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-sm"
-              >
-                <input
-                  type="checkbox"
-                  checked={form.roleIds.includes(role.id)}
-                  onChange={() => setForm({ ...form, roleIds: toggleId(form.roleIds, role.id) })}
+        <form id="user-form" className="space-y-6" onSubmit={onSubmit}>
+          <FormSection title="Profile">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="First name" required>
+                <TextInput value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} required />
+              </Field>
+              <Field label="Last name" required>
+                <TextInput value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} required />
+              </Field>
+              <Field label="Email" required>
+                <TextInput
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  required
                 />
-                <span>
-                  <span className="font-medium">{role.name}</span>
-                  {role.description ? (
-                    <span className="block text-xs text-[var(--muted-foreground)]">{role.description}</span>
-                  ) : null}
-                </span>
-              </label>
-            ))}
-          </div>
-
-          <SectionLabel>Campus access</SectionLabel>
-          <label className="mb-2 flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={form.isHq}
-              onChange={(e) => setForm({ ...form, isHq: e.target.checked })}
-            />
-            HQ access (all campuses)
-          </label>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {campuses.map((campus) => (
-              <label
-                key={campus.id}
-                className="flex items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-sm"
+              </Field>
+              <Field label="Phone">
+                <TextInput value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              </Field>
+              <Field
+                label="Password"
+                required={!editingId}
+                hint={editingId ? "Leave blank to keep the current password." : "At least 8 characters."}
+                className="sm:col-span-2"
               >
-                <input
-                  type="checkbox"
-                  checked={form.campusIds.includes(campus.id)}
-                  onChange={() => setForm({ ...form, campusIds: toggleId(form.campusIds, campus.id) })}
-                  disabled={form.isHq}
+                <TextInput
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  required={!editingId}
                 />
-                {campus.code} — {campus.name}
-              </label>
-            ))}
-          </div>
-
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
+              </Field>
+            </div>
+            <Switch
               checked={form.isActive}
-              onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
+              onChange={(v) => setForm({ ...form, isActive: v })}
+              label="Account active"
+              description="Inactive users cannot sign in."
+              disabled={editingSelf}
             />
-            Active
-          </label>
+          </FormSection>
+
+          <FormSection
+            title="Roles"
+            description={lockAccess ? "You cannot change your own roles." : "What this user is allowed to do."}
+          >
+            <div className="grid gap-2 sm:grid-cols-2">
+              {assignableRoles.map((role) => (
+                <ChoiceCard
+                  key={role.id}
+                  checked={form.roleIds.includes(role.id)}
+                  onToggle={() => setForm({ ...form, roleIds: toggleId(form.roleIds, role.id) })}
+                  title={role.name}
+                  description={role.description}
+                  disabled={lockAccess}
+                />
+              ))}
+            </div>
+          </FormSection>
+
+          <FormSection
+            title="Campus access"
+            description={lockAccess ? "You cannot change your own campus access." : "Where this user can work."}
+          >
+            {me?.isHq ? (
+              <Switch
+                checked={form.isHq}
+                onChange={(v) => setForm({ ...form, isHq: v })}
+                label="Head office (HQ) access"
+                description="Can work across every campus, including new ones."
+                disabled={lockAccess}
+              />
+            ) : null}
+            <div className="grid gap-2 sm:grid-cols-2">
+              {campuses.map((campus) => (
+                <ChoiceCard
+                  key={campus.id}
+                  checked={form.isHq || form.campusIds.includes(campus.id)}
+                  onToggle={() => setForm({ ...form, campusIds: toggleId(form.campusIds, campus.id) })}
+                  title={campus.name}
+                  description={campus.code}
+                  disabled={form.isHq || lockAccess}
+                  badge={
+                    !form.isHq && form.campusIds[0] === campus.id ? <StatusPill tone="primary">Primary</StatusPill> : null
+                  }
+                />
+              ))}
+            </div>
+            {!form.isHq && form.campusIds.length > 1 ? (
+              <p className="text-xs text-[var(--muted-foreground)]">The first campus you pick is the user’s primary campus.</p>
+            ) : null}
+          </FormSection>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete user?"
+        description={
+          pendingDelete ? `${pendingDelete.fullName} will no longer be able to sign in. This cannot be undone from the app.` : ""
+        }
+        busy={deleting}
+        onConfirm={confirmDelete}
+        onClose={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

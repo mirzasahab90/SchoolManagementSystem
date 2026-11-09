@@ -46,5 +46,8 @@ public class RoleRepository(SchoolManagementSystemDbContext dbContext) : BaseRep
     public Task<int> CountUsersAsync(int roleId, CancellationToken ct = default) =>
         Db.UserRoles.CountAsync(ur => ur.RoleId == roleId, ct);
 
+    public Task<bool> UserHasRoleAsync(int userId, int roleId, CancellationToken ct = default) =>
+        Db.UserRoles.AsNoTracking().AnyAsync(ur => ur.UserId == userId && ur.RoleId == roleId, ct);
+
     public void SoftDelete(Role role) => Db.Roles.Remove(role);
 }

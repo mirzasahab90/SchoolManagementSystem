@@ -1,27 +1,41 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Plus } from "lucide-react";
+import { Info, KeyRound, Lock, Plus, Shield, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { Modal } from "@/components/modal";
+import { ConfirmDialog, Modal } from "@/components/modal";
 import {
   Btn,
+  CheckMark,
   DataTable,
   EmptyState,
   Field,
+  IconButton,
   PageHeader,
   Panel,
   SearchField,
   StatusPill,
+  Switch,
+  TableSkeleton,
+  Td,
   TextInput,
+  THead,
   Toolbar,
+  Tr,
 } from "@/components/sms-ui";
 import { useAuth } from "@/lib/auth";
 import { api, unwrap } from "@/lib/api";
 import type { ModulePermissionCell, RoleDetail, RoleListItem } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 type ActionKey = "view" | "add" | "edit" | "delete";
+const ACTIONS: { key: ActionKey; label: string }[] = [
+  { key: "view", label: "View" },
+  { key: "add", label: "Add" },
+  { key: "edit", label: "Edit" },
+  { key: "delete", label: "Delete" },
+];
 
 export function RolesPage() {
-  const { can } = useAuth();
+  const { can, user: me } = useAuth();
   const [items, setItems] = useState<RoleListItem[]>([]);
   const [detail, setDetail] = useState<RoleDetail | null>(null);
   const [matrix, setMatrix] = useState<ModulePermissionCell[]>([]);
@@ -35,6 +49,14 @@ export function RolesPage() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<RoleListItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // Roles apply to every campus, so only HQ manages them (enforced by the API too).
+  const isHq = !!me?.isHq;
+  const holdsRole = !!detail && !!me?.roles.includes(detail.name);
+  const isSuperAdminRole = detail?.name === "SuperAdmin";
+  const canEdit = isHq && can("roles", "Edit") && (!holdsRole || !!me?.isSuperAdmin) && (!isSuperAdminRole || !!me?.isSuperAdmin);
 
   async function load() {
     setLoading(true);
@@ -54,9 +76,7 @@ export function RolesPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return items;
-    return items.filter((r) =>
-      [r.name, r.description ?? ""].join(" ").toLowerCase().includes(q),
-    );
+    return items.filter((r) => [r.name, r.description ?? ""].join(" ").toLowerCase().includes(q));
   }, [items, query]);
 
   async function openEdit(id: number) {
@@ -73,48 +93,29 @@ export function RolesPage() {
     }
   }
 
+  function applyRule(row: ModulePermissionCell, action: ActionKey, value: boolean) {
+    const next = { ...row, [action]: value };
+    // Add / Edit / Delete need View; removing View removes the rest.
+    if (action !== "view" && value) next.view = true;
+    if (action === "view" && !value) {
+      next.add = false;
+      next.edit = false;
+      next.delete = false;
+    }
+    return next;
+  }
+
   function toggle(moduleKey: string, action: ActionKey) {
-    setMatrix((prev) =>
-      prev.map((row) => {
-        if (row.moduleKey !== moduleKey) return row;
-        const next = { ...row, [action]: !row[action] };
-        // Enabling Add/Edit/Delete implies View
-        if (action !== "view" && next[action]) next.view = true;
-        // Disabling View clears other CRUD
-        if (action === "view" && !next.view) {
-          next.add = false;
-          next.edit = false;
-          next.delete = false;
-        }
-        return next;
-      }),
-    );
+    setMatrix((prev) => prev.map((row) => (row.moduleKey === moduleKey ? applyRule(row, action, !row[action]) : row)));
   }
 
   function setColumn(action: ActionKey, value: boolean) {
-    setMatrix((prev) =>
-      prev.map((row) => {
-        const next = { ...row, [action]: value };
-        if (action !== "view" && value) next.view = true;
-        if (action === "view" && !value) {
-          next.add = false;
-          next.edit = false;
-          next.delete = false;
-        }
-        return next;
-      }),
-    );
+    setMatrix((prev) => prev.map((row) => applyRule(row, action, value)));
   }
 
-  function grantAll() {
+  function setRow(moduleKey: string, value: boolean) {
     setMatrix((prev) =>
-      prev.map((row) => ({ ...row, view: true, add: true, edit: true, delete: true })),
-    );
-  }
-
-  function clearAll() {
-    setMatrix((prev) =>
-      prev.map((row) => ({ ...row, view: false, add: false, edit: false, delete: false })),
+      prev.map((row) => (row.moduleKey === moduleKey ? { ...row, view: value, add: value, edit: value, delete: value } : row)),
     );
   }
 
@@ -123,15 +124,8 @@ export function RolesPage() {
     if (!detail) return;
     setSaving(true);
     try {
-      await unwrap(
-        api.put(`/roles/${detail.id}`, {
-          name,
-          description,
-          isActive,
-          matrix,
-        }),
-      );
-      toast.success("Role permissions saved");
+      await unwrap(api.put(`/roles/${detail.id}`, { name, description, isActive, matrix }));
+      toast.success("Permissions saved");
       setOpen(false);
       await load();
     } catch (err) {
@@ -145,10 +139,8 @@ export function RolesPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const created = (await unwrap(
-        api.post("/roles", { name: newName, description: newDescription }),
-      )) as RoleDetail;
-      toast.success("Role created");
+      const created = (await unwrap(api.post("/roles", { name: newName, description: newDescription }))) as RoleDetail;
+      toast.success("Role created — now choose its permissions");
       setCreateOpen(false);
       setNewName("");
       setNewDescription("");
@@ -161,104 +153,123 @@ export function RolesPage() {
     }
   }
 
-  async function remove(role: RoleListItem) {
-    if (role.isSystem) {
-      toast.error("System roles cannot be deleted");
-      return;
-    }
-    if (!confirm(`Delete role “${role.name}”?`)) return;
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    setDeleting(true);
     try {
-      await unwrap(api.delete(`/roles/${role.id}`));
+      await unwrap(api.delete(`/roles/${pendingDelete.id}`));
       toast.success("Role deleted");
+      setPendingDelete(null);
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setDeleting(false);
     }
   }
 
-  const isSuperAdminRole = detail?.name === "SuperAdmin";
-  const grantedCount = matrix.reduce(
-    (sum, row) => sum + [row.view, row.add, row.edit, row.delete].filter(Boolean).length,
-    0,
-  );
+  const grantedCount = matrix.reduce((sum, row) => sum + ACTIONS.filter((a) => row[a.key]).length, 0);
+  const totalCells = matrix.length * ACTIONS.length;
 
   return (
     <div>
       <PageHeader
         title="Roles & permissions"
-        description="Decide which menus each role can View / Add / Edit / Delete. Users only see menus granted here for their campuses."
+        description="Roles are templates shared by every campus. Choose which menus each role can view, add, edit or delete."
         actions={
-          can("roles", "Add") ? (
+          isHq && can("roles", "Add") ? (
             <Btn type="button" onClick={() => setCreateOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus />
               Add role
             </Btn>
           ) : null
         }
       />
 
-      <Panel>
+      {!isHq ? (
+        <div className="mb-5 flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--info-soft)] px-4 py-3 text-sm text-[var(--info)]">
+          <Info className="mt-0.5 size-4 shrink-0" />
+          Roles apply to every campus, so only head office can change them. You can still see what each role allows.
+        </div>
+      ) : null}
+
+      <Panel flush>
         <Toolbar>
-          <SearchField value={query} onChange={setQuery} placeholder="Search roles…" />
-          <div className="text-sm text-[var(--muted-foreground)]">
-            {filtered.length} of {items.length}
+          <SearchField value={query} onChange={setQuery} placeholder="Search roles" />
+          <div className="text-xs text-[var(--muted-foreground)]">
+            <span className="tabular font-medium text-[var(--foreground)]">{items.length}</span> roles
           </div>
         </Toolbar>
 
         {loading ? (
-          <div className="text-sm text-[var(--muted-foreground)]">Loading…</div>
+          <TableSkeleton cols={5} />
         ) : filtered.length === 0 ? (
-          <EmptyState title="No roles" description="Restart API so system roles can seed." />
+          <EmptyState icon={Shield} title="No roles found" description="Try a different search." />
         ) : (
           <DataTable>
-            <thead className="bg-[var(--muted)] text-xs uppercase tracking-wide text-[var(--muted-foreground)]">
-              <tr>
-                <th className="px-4 py-3">Role</th>
-                <th className="px-4 py-3">Users</th>
-                <th className="px-4 py-3">Permissions</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
+            <THead
+              columns={[
+                { label: "Role" },
+                { label: "Users" },
+                { label: "Permissions" },
+                { label: "Type" },
+                { label: "Status" },
+                { label: "Actions", align: "right" },
+              ]}
+            />
             <tbody>
               {filtered.map((role) => (
-                <tr key={role.id} className="border-t border-[var(--border)]">
-                  <td className="px-4 py-3">
-                    <div className="font-medium">{role.name}</div>
-                    <div className="text-xs text-[var(--muted-foreground)]">{role.description || "—"}</div>
-                  </td>
-                  <td className="px-4 py-3">{role.userCount}</td>
-                  <td className="px-4 py-3">
-                    {role.name === "SuperAdmin" ? "Full access" : `${role.permissionCount} grants`}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusPill tone={role.isSystem ? "info" : "neutral"}>
-                      {role.isSystem ? "System" : "Custom"}
-                    </StatusPill>
-                  </td>
-                  <td className="px-4 py-3">
+                <Tr key={role.id} onClick={() => openEdit(role.id)}>
+                  <Td>
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={cn(
+                          "inline-flex size-9 shrink-0 items-center justify-center rounded-lg",
+                          role.name === "SuperAdmin"
+                            ? "bg-[var(--primary-soft)] text-[var(--primary-soft-foreground)]"
+                            : "bg-[var(--muted)] text-[var(--muted-foreground)]",
+                        )}
+                      >
+                        {role.name === "SuperAdmin" ? <ShieldCheck className="size-4" /> : <KeyRound className="size-4" />}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 font-medium">
+                          {role.name}
+                          {me?.roles.includes(role.name) ? <StatusPill tone="primary">Yours</StatusPill> : null}
+                        </div>
+                        <div className="truncate text-xs text-[var(--muted-foreground)]">{role.description || "No description"}</div>
+                      </div>
+                    </div>
+                  </Td>
+                  <Td className="tabular">{role.userCount}</Td>
+                  <Td>
+                    {role.name === "SuperAdmin" ? (
+                      <StatusPill tone="primary">Full access</StatusPill>
+                    ) : (
+                      <span className="tabular text-[var(--muted-foreground)]">{role.permissionCount} grants</span>
+                    )}
+                  </Td>
+                  <Td>
+                    <StatusPill tone={role.isSystem ? "info" : "neutral"}>{role.isSystem ? "System" : "Custom"}</StatusPill>
+                  </Td>
+                  <Td>
                     <StatusPill tone={role.isActive ? "success" : "neutral"} dot>
                       {role.isActive ? "Active" : "Inactive"}
                     </StatusPill>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {can("roles", "View") || can("roles", "Edit") ? (
-                      <button
-                        type="button"
-                        className="mr-3 text-[var(--primary)]"
-                        onClick={() => openEdit(role.id)}
-                      >
-                        Permissions
-                      </button>
-                    ) : null}
-                    {!role.isSystem && can("roles", "Delete") ? (
-                      <button type="button" className="text-red-600" onClick={() => remove(role)}>
-                        Delete
-                      </button>
-                    ) : null}
-                  </td>
-                </tr>
+                  </Td>
+                  <Td align="right">
+                    <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                      <Btn type="button" size="sm" variant="outline" onClick={() => openEdit(role.id)}>
+                        {isHq && can("roles", "Edit") ? "Permissions" : "View"}
+                      </Btn>
+                      {!role.isSystem && isHq && can("roles", "Delete") ? (
+                        <IconButton label={`Delete ${role.name}`} tone="danger" onClick={() => setPendingDelete(role)}>
+                          <Trash2 />
+                        </IconButton>
+                      ) : null}
+                    </div>
+                  </Td>
+                </Tr>
               ))}
             </tbody>
           </DataTable>
@@ -268,117 +279,116 @@ export function RolesPage() {
       <Modal
         open={open}
         wide
-        title={detail ? `Permissions · ${detail.name}` : "Permissions"}
+        title={detail ? detail.name : "Permissions"}
         description={
           isSuperAdminRole
-            ? "SuperAdmin always has full access. Description can still be edited."
-            : `Tick CRUD rights per menu. Currently ${grantedCount} grants selected.`
+            ? "SuperAdmin always has full access to every menu and campus."
+            : `${grantedCount} of ${totalCells} permissions granted`
         }
         onClose={() => setOpen(false)}
         footer={
           <>
-            <Btn type="button" variant="ghost" onClick={() => setOpen(false)}>
-              Cancel
+            <Btn type="button" variant="outline" onClick={() => setOpen(false)}>
+              {canEdit ? "Cancel" : "Close"}
             </Btn>
-            {can("roles", "Edit") ? (
+            {canEdit ? (
               <Btn type="submit" form="role-form" disabled={saving}>
-                {saving ? "Saving…" : "Save"}
+                {saving ? "Saving…" : "Save permissions"}
               </Btn>
             ) : null}
           </>
         }
       >
-        <form id="role-form" className="space-y-4" onSubmit={saveRole}>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Name">
-              <TextInput
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                disabled={detail?.isSystem || !can("roles", "Edit")}
-              />
+        <form id="role-form" className="space-y-5" onSubmit={saveRole}>
+          {!canEdit && isHq && holdsRole && !me?.isSuperAdmin ? (
+            <div className="flex items-start gap-2.5 rounded-lg bg-[var(--warning-soft)] px-3 py-2.5 text-sm text-[var(--warning)]">
+              <Lock className="mt-0.5 size-4 shrink-0" />
+              You hold this role, so you cannot change its permissions. Ask a SuperAdmin.
+            </div>
+          ) : null}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Role name" hint={detail?.isSystem ? "System role names cannot change." : undefined}>
+              <TextInput value={name} onChange={(e) => setName(e.target.value)} required disabled={detail?.isSystem || !canEdit} />
             </Field>
-            <Field label="Active">
-              <label className="flex h-10 items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={isActive}
-                  disabled={isSuperAdminRole || !can("roles", "Edit")}
-                  onChange={(e) => setIsActive(e.target.checked)}
-                />
-                Role is active
-              </label>
+            <Field label="Description">
+              <TextInput value={description} onChange={(e) => setDescription(e.target.value)} disabled={!canEdit} />
             </Field>
           </div>
-          <Field label="Description">
-            <TextInput
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              disabled={!can("roles", "Edit")}
-            />
-          </Field>
+          <Switch
+            checked={isActive}
+            onChange={setIsActive}
+            label="Role active"
+            description="Users with an inactive role lose its permissions."
+            disabled={isSuperAdminRole || !canEdit}
+          />
 
           {!isSuperAdminRole ? (
-            <div className="space-y-3">
-              {can("roles", "Edit") ? (
-                <div className="flex flex-wrap gap-2">
-                  <Btn type="button" variant="secondary" className="h-8 text-xs" onClick={grantAll}>
-                    Grant all
-                  </Btn>
-                  <Btn type="button" variant="ghost" className="h-8 text-xs" onClick={clearAll}>
-                    Clear all
-                  </Btn>
-                </div>
-              ) : null}
-              <div className="overflow-hidden rounded-xl border border-[var(--border)]">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-[var(--muted)] text-xs uppercase tracking-wide text-[var(--muted-foreground)]">
-                    <tr>
-                      <th className="px-3 py-2">Menu</th>
-                      {(["view", "add", "edit", "delete"] as const).map((action) => (
-                        <th key={action} className="px-3 py-2 text-center">
-                          <div>{action}</div>
-                          {can("roles", "Edit") ? (
+            <div className="overflow-hidden rounded-xl border border-[var(--border)]">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border)] bg-[var(--muted)]/60">
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--muted-foreground)]">Menu</th>
+                    {ACTIONS.map((a) => {
+                      const all = matrix.length > 0 && matrix.every((r) => r[a.key]);
+                      return (
+                        <th key={a.key} className="w-20 px-2 py-2.5 text-center text-xs font-medium text-[var(--muted-foreground)]">
+                          <button
+                            type="button"
+                            disabled={!canEdit}
+                            onClick={() => setColumn(a.key, !all)}
+                            title={canEdit ? `Toggle ${a.label} for every menu` : undefined}
+                            className="inline-flex flex-col items-center gap-1.5 rounded-md px-1.5 py-0.5 enabled:hover:text-[var(--foreground)]"
+                          >
+                            {a.label}
+                            <CheckMark checked={all} className="mt-0" />
+                          </button>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {matrix.map((row) => {
+                    const full = ACTIONS.every((a) => row[a.key]);
+                    return (
+                      <tr key={row.moduleKey} className="border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--card-hover)]">
+                        <td className="px-4 py-2.5">
+                          <button
+                            type="button"
+                            disabled={!canEdit}
+                            onClick={() => setRow(row.moduleKey, !full)}
+                            title={canEdit ? "Toggle every action for this menu" : undefined}
+                            className="font-medium enabled:hover:text-[var(--primary)]"
+                          >
+                            {row.moduleName}
+                          </button>
+                        </td>
+                        {ACTIONS.map((a) => (
+                          <td key={a.key} className="px-2 py-2.5 text-center">
                             <button
                               type="button"
-                              className="mt-1 text-[10px] font-normal normal-case text-[var(--primary)]"
-                              onClick={() =>
-                                setColumn(
-                                  action,
-                                  !matrix.every((r) => r[action]),
-                                )
-                              }
+                              role="checkbox"
+                              aria-checked={row[a.key]}
+                              aria-label={`${a.label} ${row.moduleName}`}
+                              disabled={!canEdit}
+                              onClick={() => toggle(row.moduleKey, a.key)}
+                              className="inline-flex rounded p-1 outline-none focus-visible:ring-4 focus-visible:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                              toggle
+                              <CheckMark checked={row[a.key]} className="mt-0" />
                             </button>
-                          ) : null}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {matrix.map((row) => (
-                      <tr key={row.moduleKey} className="border-t border-[var(--border)]">
-                        <td className="px-3 py-2 font-medium">{row.moduleName}</td>
-                        {(["view", "add", "edit", "delete"] as const).map((action) => (
-                          <td key={action} className="px-3 py-2 text-center">
-                            <input
-                              type="checkbox"
-                              checked={row[action]}
-                              disabled={!can("roles", "Edit")}
-                              onChange={() => toggle(row.moduleKey, action)}
-                            />
                           </td>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           ) : (
-            <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)]/50 px-4 py-3 text-sm text-[var(--muted-foreground)]">
-              SuperAdmin bypasses the permission matrix in code — every menu and action is allowed.
+            <div className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--primary-soft)]/60 px-4 py-3 text-sm">
+              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[var(--primary)]" />
+              SuperAdmin skips the permission matrix — every menu, action and campus is allowed.
             </div>
           )}
         </form>
@@ -387,28 +397,37 @@ export function RolesPage() {
       <Modal
         open={createOpen}
         title="Add role"
-        description="Create a role, then set its menu permissions."
+        description="Create the role first, then choose its permissions."
         onClose={() => setCreateOpen(false)}
         footer={
           <>
-            <Btn type="button" variant="ghost" onClick={() => setCreateOpen(false)}>
+            <Btn type="button" variant="outline" onClick={() => setCreateOpen(false)}>
               Cancel
             </Btn>
             <Btn type="submit" form="create-role-form" disabled={saving}>
-              {saving ? "Creating…" : "Create"}
+              {saving ? "Creating…" : "Create role"}
             </Btn>
           </>
         }
       >
-        <form id="create-role-form" className="space-y-3" onSubmit={createRole}>
-          <Field label="Name">
-            <TextInput value={newName} onChange={(e) => setNewName(e.target.value)} required />
+        <form id="create-role-form" className="space-y-4" onSubmit={createRole}>
+          <Field label="Role name" required>
+            <TextInput value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Admissions officer" required autoFocus />
           </Field>
           <Field label="Description">
-            <TextInput value={newDescription} onChange={(e) => setNewDescription(e.target.value)} />
+            <TextInput value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="What this role is for" />
           </Field>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete role?"
+        description={pendingDelete ? `The “${pendingDelete.name}” role will be removed. Roles still assigned to users cannot be deleted.` : ""}
+        busy={deleting}
+        onConfirm={confirmDelete}
+        onClose={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

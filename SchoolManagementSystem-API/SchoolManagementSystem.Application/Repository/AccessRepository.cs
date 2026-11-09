@@ -35,6 +35,34 @@ public class AccessRepository(SchoolManagementSystemDbContext dbContext) : BaseR
         return new UserAccessDto(false, roles, map);
     }
 
+    /// <summary>Null when the user does not exist or is inactive. CampusIds are active campuses, primary first.</summary>
+    public async Task<UserCampusAccessDto?> GetCampusAccessAsync(int userId, CancellationToken ct = default)
+    {
+        var user = await Db.Users.AsNoTracking()
+            .Where(u => u.Id == userId && u.IsActive)
+            .Select(u => new { u.IsHq })
+            .FirstOrDefaultAsync(ct);
+        if (user == null)
+        {
+            return null;
+        }
+
+        var isSuperAdmin = await Db.UserRoles.AsNoTracking()
+            .AnyAsync(ur => ur.UserId == userId
+                            && ur.Role.Name == SystemRoles.SuperAdmin
+                            && ur.Role.IsActive
+                            && !ur.Role.IsDeleted, ct);
+
+        var campusIds = await Db.UserCampuses.AsNoTracking()
+            .Where(uc => uc.UserId == userId && uc.Campus.IsActive && !uc.Campus.IsDeleted)
+            .OrderByDescending(uc => uc.IsPrimary)
+            .ThenBy(uc => uc.Campus.Name)
+            .Select(uc => uc.CampusId)
+            .ToListAsync(ct);
+
+        return new UserCampusAccessDto(user.IsHq || isSuperAdmin, isSuperAdmin, campusIds);
+    }
+
     public Task<List<Module>> GetActiveModulesAsync(CancellationToken ct = default) =>
         Db.Modules.AsNoTracking().Where(m => m.IsActive).OrderBy(m => m.DisplayOrder).ToListAsync(ct);
 }
