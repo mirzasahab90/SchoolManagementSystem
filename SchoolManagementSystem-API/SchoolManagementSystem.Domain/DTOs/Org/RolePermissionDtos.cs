@@ -1,6 +1,8 @@
 namespace SchoolManagementSystem.Domain.DTOs.Org;
 
-public record RoleListItemDto(int Id, string Name, string? Description, bool IsSystem, bool IsActive, int UserCount, int PermissionCount);
+public record RoleListItemDto(
+    int Id, string Name, string? Description, bool IsSystem, bool IsActive, int UserCount, int PermissionCount,
+    int? CampusId, string? CampusCode, bool HqAssignOnly);
 
 public record ModulePermissionCellDto(string ModuleKey, string ModuleName, bool View, bool Add, bool Edit, bool Delete);
 

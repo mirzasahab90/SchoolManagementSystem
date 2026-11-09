@@ -10,8 +10,11 @@ public class AccessRepository(SchoolManagementSystemDbContext dbContext) : BaseR
 {
     public async Task<UserAccessDto> GetUserAccessAsync(int userId, CancellationToken ct = default)
     {
+        // Ignore query filters: permissions are resolved outside the request's campus scope
+        // (the checker runs in its own DI scope), and campus-owned roles must still count.
         var roles = await Db.UserRoles
             .AsNoTracking()
+            .IgnoreQueryFilters()
             .Where(ur => ur.UserId == userId && ur.Role.IsActive && !ur.Role.IsDeleted)
             .Select(ur => ur.Role.Name)
             .ToListAsync(ct);
@@ -24,7 +27,8 @@ public class AccessRepository(SchoolManagementSystemDbContext dbContext) : BaseR
 
         var rows = await Db.RoleModulePermissions
             .AsNoTracking()
-            .Where(rmp => rmp.Role.UserRoles.Any(ur => ur.UserId == userId) && rmp.Role.IsActive && !rmp.Role.IsDeleted)
+            .IgnoreQueryFilters()
+            .Where(rmp => rmp.Role.UserRoles.Any(ur => ur.UserId == userId) && rmp.Role.IsActive && !rmp.Role.IsDeleted && rmp.Module.IsActive)
             .Select(rmp => new { ModuleKey = rmp.Module.Key, Action = rmp.Permission.Code })
             .ToListAsync(ct);
 

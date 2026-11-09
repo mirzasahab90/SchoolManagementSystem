@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using SchoolManagementSystem.Domain.Abstractions;
 using SchoolManagementSystem.Domain.Common;
+using SchoolManagementSystem.Domain.Entities.Academics;
 using SchoolManagementSystem.Domain.Entities.Identity;
 using SchoolManagementSystem.Domain.Entities.Org;
 
@@ -26,6 +27,11 @@ public class SchoolManagementSystemDbContext(DbContextOptions<SchoolManagementSy
     public DbSet<School> Schools => Set<School>();
     public DbSet<Campus> Campuses => Set<Campus>();
     public DbSet<UserCampus> UserCampuses => Set<UserCampus>();
+    public DbSet<AcademicSession> AcademicSessions => Set<AcademicSession>();
+    public DbSet<SchoolClass> Classes => Set<SchoolClass>();
+    public DbSet<Subject> Subjects => Set<Subject>();
+    public DbSet<ClassSubject> ClassSubjects => Set<ClassSubject>();
+    public DbSet<Section> Sections => Set<Section>();
 
     /// <summary>Campuses the current request may read; evaluated per query by the EF filters below.</summary>
     private IReadOnlyCollection<int> CampusFilterIds => currentUser.DataCampusIds ?? [];
@@ -50,6 +56,22 @@ public class SchoolManagementSystemDbContext(DbContextOptions<SchoolManagementSy
     {
         var softDelete = typeof(AuditableEntity).IsAssignableFrom(typeof(TEntity));
         var campusScoped = typeof(ICampusScoped).IsAssignableFrom(typeof(TEntity));
+        var campusOwnable = typeof(ICampusOwnable).IsAssignableFrom(typeof(TEntity));
+
+        if (campusOwnable)
+        {
+            // HQ rows (null campus) are visible everywhere; campus rows only within the request's campuses.
+            Expression<Func<TEntity, bool>> owned = softDelete
+                ? e => !EF.Property<bool>(e, nameof(AuditableEntity.IsDeleted))
+                       && (EF.Property<int?>(e, nameof(ICampusOwnable.CampusId)) == null
+                           || CampusFilterDisabled
+                           || CampusFilterIds.Contains(EF.Property<int?>(e, nameof(ICampusOwnable.CampusId))!.Value))
+                : e => EF.Property<int?>(e, nameof(ICampusOwnable.CampusId)) == null
+                       || CampusFilterDisabled
+                       || CampusFilterIds.Contains(EF.Property<int?>(e, nameof(ICampusOwnable.CampusId))!.Value);
+            modelBuilder.Entity<TEntity>().HasQueryFilter(owned);
+            return;
+        }
 
         Expression<Func<TEntity, bool>>? filter = (softDelete, campusScoped) switch
         {
@@ -98,6 +120,45 @@ public class SchoolManagementSystemDbContext(DbContextOptions<SchoolManagementSy
     }
 
     /// <summary>
+    /// HQ rows (null campus) may only be written by HQ. A campus user's new rows belong to their working campus.
+    /// </summary>
+    private void GuardCampusOwnableChanges()
+    {
+        foreach (var entry in ChangeTracker.Entries<ICampusOwnable>())
+        {
+            if (entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted))
+            {
+                continue;
+            }
+
+            if (entry.State == EntityState.Added && entry.Entity.CampusId == null && !currentUser.IsHq)
+            {
+                entry.Entity.CampusId = currentUser.ActiveCampusId
+                    ?? throw new CampusAccessException("Select a campus.");
+            }
+
+            var owners = new List<int?> { entry.Entity.CampusId };
+            if (entry.State == EntityState.Modified)
+            {
+                owners.Add((int?)entry.Property(nameof(ICampusOwnable.CampusId)).OriginalValue);
+            }
+
+            foreach (var owner in owners)
+            {
+                if (owner == null && !currentUser.IsHq)
+                {
+                    throw new CampusAccessException("Only HQ can change head-office items.");
+                }
+
+                if (owner is int campusId && !currentUser.CanAccessCampus(campusId))
+                {
+                    throw new CampusAccessException("You do not have access to this campus.");
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// New campus data gets the working campus; nobody may write rows of a campus they cannot access.
     /// Skipped for background work (no signed-in user), e.g. seeding.
     /// </summary>
@@ -107,6 +168,8 @@ public class SchoolManagementSystemDbContext(DbContextOptions<SchoolManagementSy
         {
             return;
         }
+
+        GuardCampusOwnableChanges();
 
         foreach (var entry in ChangeTracker.Entries<ICampusScoped>())
         {

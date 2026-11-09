@@ -5,6 +5,9 @@ public static class SystemRoles
     /// <summary>Full access to every module and every campus; cannot be deleted or renamed.</summary>
     public const string SuperAdmin = "SuperAdmin";
 
+    /// <summary>Runs one campus; appointed by HQ only.</summary>
+    public const string CampusAdmin = "CampusAdmin";
+
     public const string Principal = "Principal";
     public const string Accountant = "Accountant";
     public const string Teacher = "Teacher";

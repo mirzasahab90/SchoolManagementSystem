@@ -18,7 +18,10 @@ public class RoleRepository(SchoolManagementSystemDbContext dbContext) : BaseRep
                 r.IsSystem,
                 r.IsActive,
                 r.UserRoles.Count,
-                r.Permissions.Count))
+                r.Permissions.Count,
+                r.CampusId,
+                r.Campus != null ? r.Campus.Code : null,
+                r.HqAssignOnly))
             .ToListAsync(ct);
 
     public Task<Role?> GetTrackedAsync(int id, CancellationToken ct = default) =>

@@ -14,5 +14,8 @@ public class Module : Entity
     public int DisplayOrder { get; set; }
     public bool IsActive { get; set; } = true;
 
+    /// <summary>A campus-level module: CampusAdmin is granted full rights on it automatically.</summary>
+    public bool CampusLevel { get; set; }
+
     public ICollection<Module> Children { get; set; } = new List<Module>();
 }
