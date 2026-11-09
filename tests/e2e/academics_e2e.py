@@ -373,6 +373,51 @@ def sessions(hq):
     check("cannot delete HQ current session", s == 400, (s, r))
 
 
+# ------------------------------------------------------------------ subjects
+
+def create_subject(token, code, campus=None, **extra):
+    body = {"code": code, "name": f"QA {code}", "type": "Theory", "isActive": True}
+    body.update(extra)
+    s, r = call("POST", "/subjects", body, token=token, campus=campus)
+    if s == 200:
+        track("subjects", r["data"]["id"])
+    return s, r
+
+
+def subject_id(token, code, campus=None):
+    return next(x["id"] for x in data(call("GET", "/subjects", token=token, campus=campus)) if x["code"] == code)
+
+
+@group
+def subjects(hq):
+    a, b = demo_campuses(hq)
+    _, ca = campus_admin(hq, a)
+    _, cb = campus_admin(hq, b)
+
+    s, r = create_subject(hq, "qa1", type="Practical")
+    check("HQ creates subject, code upper-cased", s == 200 and r["data"]["code"] == "QA1" and r["data"].get("campusId") is None, (s, r))
+    s, r = create_subject(hq, "QA1")
+    check("duplicate code -> 409", s == 409, (s, r))
+
+    s, r = create_subject(ca, "QAA", campus=a)
+    check("campus admin creates campus subject", s == 200 and r["data"].get("campusCode"), (s, r))
+    codes_b = [x["code"] for x in data(call("GET", "/subjects", token=hq, campus=b))]
+    check("campus subject hidden on another campus", "QAA" not in codes_b, codes_b)
+    all_rows = data(call("GET", "/subjects", token=hq))
+    qaa = next((x for x in all_rows if x["code"] == "QAA"), None)
+    check("HQ on All campuses sees campus subject with owner", qaa and qaa.get("campusCode"), qaa)
+    s, r = create_subject(cb, "QAA", campus=b)
+    check("same code allowed on two campuses", s == 200, (s, r))
+    s, r = create_subject(ca, "ENG", campus=a)
+    check("campus code cannot shadow HQ code", s == 409, (s, r))
+
+    eng = subject_id(hq, "ENG")
+    s, r = call("DELETE", f"/subjects/{eng}", token=hq)
+    check("used subject cannot be deleted", s == 400, (s, r))
+    s, r = call("PUT", f"/subjects/{eng}", {"code": "ENG", "name": "English", "type": "Theory", "isActive": True}, token=ca, campus=a)
+    check("campus admin cannot change HQ subject", s == 403, (s, r))
+
+
 # ------------------------------------------------------------------ runner
 
 def main(argv):
