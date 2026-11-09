@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode, type RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import {
+  BookOpen,
   Building2,
+  CalendarRange,
+  KeyRound,
+  LayoutGrid,
+  Layers,
+  School,
   Check,
   ChevronRight,
   ChevronsUpDown,
@@ -23,6 +29,8 @@ import {
 import { Avatar, StatusPill } from "@/components/sms-ui";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
+import { Modal } from "@/components/modal";
+import { ChangePasswordForm } from "@/pages/change-password";
 import type { MenuItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +40,12 @@ const iconMap: Record<string, ComponentType<{ className?: string }>> = {
   users: Users,
   shield: Shield,
   settings: Settings,
+  school: School,
+  "graduation-cap": GraduationCap,
+  "calendar-range": CalendarRange,
+  layers: Layers,
+  "book-open": BookOpen,
+  "layout-grid": LayoutGrid,
 };
 
 const COLLAPSE_KEY = "schoolms.sidebarCollapsed";
@@ -322,12 +336,21 @@ function UserMenu() {
   const { user, logout } = useAuth();
   const { theme, toggle } = useTheme();
   const [open, setOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useClickOutside(ref, () => setOpen(false), open);
   if (!user) return null;
 
   return (
     <div ref={ref} className="relative">
+      <Modal
+        open={passwordOpen}
+        title="Change password"
+        description="Other devices will be signed out."
+        onClose={() => setPasswordOpen(false)}
+      >
+        <ChangePasswordForm onDone={() => setPasswordOpen(false)} />
+      </Modal>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -359,6 +382,15 @@ function UserMenu() {
               ))}
           </div>
           <div className="p-1.5">
+            <MenuRow
+              onClick={() => {
+                setOpen(false);
+                setPasswordOpen(true);
+              }}
+              icon={<KeyRound />}
+            >
+              Change password
+            </MenuRow>
             <MenuRow onClick={toggle} icon={theme === "dark" ? <Sun /> : <Moon />}>
               {theme === "dark" ? "Light mode" : "Dark mode"}
             </MenuRow>

@@ -3,7 +3,13 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { GraduationCap } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/lib/auth";
+import { AcademicSessionsPage } from "@/pages/academics/sessions";
+import { ClassesPage } from "@/pages/academics/classes";
+import { SectionsPage } from "@/pages/academics/sections";
+import { SubjectsPage } from "@/pages/academics/subjects";
 import { CampusesPage } from "@/pages/campuses";
+import { ChangePasswordPage } from "@/pages/change-password";
+import { MyCampusPage } from "@/pages/my-campus";
 import { DashboardPage } from "@/pages/dashboard";
 import { LoginPage } from "@/pages/login";
 import { RolesPage } from "@/pages/roles";
@@ -24,6 +30,7 @@ function Protected({ children }: { children: ReactNode }) {
     );
   }
   if (!user) return <Navigate to="/login" replace />;
+  if (user.mustChangePassword) return <ChangePasswordPage />;
   return children;
 }
 
@@ -43,6 +50,11 @@ export default function App() {
         <Route path="campuses" element={<CampusesPage />} />
         <Route path="users" element={<UsersPage />} />
         <Route path="roles" element={<RolesPage />} />
+        <Route path="my-campus" element={<MyCampusPage />} />
+        <Route path="academics/sessions" element={<AcademicSessionsPage />} />
+        <Route path="academics/classes" element={<ClassesPage />} />
+        <Route path="academics/subjects" element={<SubjectsPage />} />
+        <Route path="academics/sections" element={<SectionsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/admin" replace />} />
     </Routes>

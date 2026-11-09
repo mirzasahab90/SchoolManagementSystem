@@ -1,6 +1,6 @@
 import { useEffect, useState, type ComponentType } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowUpRight, Building2, Globe2, KeyRound, Plus, Shield, ShieldCheck, UserPlus, Users } from "lucide-react";
+import { ArrowUpRight, Building2, Globe2, GraduationCap, KeyRound, Plus, Shield, ShieldCheck, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, KpiCard, KpiGrid, PageHeader, Panel, Skeleton, StatusPill, type StatusTone } from "@/components/sms-ui";
 import { useAuth } from "@/lib/auth";
@@ -15,6 +15,7 @@ const kpiStyle: Record<string, { icon: Icon; accent: StatusTone }> = {
   users: { icon: Users, accent: "info" },
   roles: { icon: Shield, accent: "warning" },
   hq: { icon: Globe2, accent: "success" },
+  academics: { icon: GraduationCap, accent: "primary" },
 };
 
 const actionIcon: Record<string, Icon> = {

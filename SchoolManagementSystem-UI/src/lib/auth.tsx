@@ -19,6 +19,7 @@ type AuthContextValue = {
   /** Null = HQ "All campuses". */
   setActiveCampus: (campusId: number | null) => Promise<void>;
   can: (moduleKey: string, action: string) => boolean;
+  changePassword: (current: string, next: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -94,6 +95,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [refreshMe],
   );
 
+  const changePassword = useCallback(
+    async (current: string, next: string) => {
+      await unwrap(api.post("/auth/change-password", { currentPassword: current, newPassword: next }));
+      await refreshMe();
+    },
+    [refreshMe],
+  );
+
   const can = useCallback(
     (moduleKey: string, action: string) => {
       if (!user) return false;
@@ -105,8 +114,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ user, loading, login, logout, refreshMe, setActiveCampus, can }),
-    [user, loading, login, logout, refreshMe, setActiveCampus, can],
+    () => ({ user, loading, login, logout, refreshMe, setActiveCampus, can, changePassword }),
+    [user, loading, login, logout, refreshMe, setActiveCampus, can, changePassword],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

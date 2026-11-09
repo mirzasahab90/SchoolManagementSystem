@@ -70,6 +70,7 @@ export type Campus = {
   notes?: string | null;
   isActive: boolean;
   adminUserCount: number;
+  admins?: CampusAdminRef[];
 };
 
 export type SaveCampusRequest = {
@@ -91,6 +92,7 @@ export type SaveCampusRequest = {
   studentCapacity?: number | null;
   notes?: string;
   isActive: boolean;
+  admin?: NewCampusAdmin | null;
 };
 
 export type RoleRef = { id: number; name: string };
@@ -119,6 +121,7 @@ export type SaveUserRequest = {
   roleIds: number[];
   campusIds: number[];
   password?: string;
+  mustChangePassword?: boolean;
 };
 
 export type RoleListItem = {
@@ -129,6 +132,9 @@ export type RoleListItem = {
   isActive: boolean;
   userCount: number;
   permissionCount: number;
+  campusId?: number | null;
+  campusCode?: string | null;
+  hqAssignOnly: boolean;
 };
 
 export type ModulePermissionCell = {
@@ -147,6 +153,9 @@ export type RoleDetail = {
   isSystem: boolean;
   isActive: boolean;
   matrix: ModulePermissionCell[];
+  campusId?: number | null;
+  campusCode?: string | null;
+  hqAssignOnly?: boolean;
 };
 
 export type KpiCard = {
@@ -172,3 +181,138 @@ export type Dashboard = {
   kpis: KpiCard[];
   quickActions: QuickAction[];
 };
+
+/* ------------------------------------------------------------------ */
+/* Ownership: campusId / campusCode are absent for head-office (HQ) rows */
+/* ------------------------------------------------------------------ */
+
+export type Owned = {
+  campusId?: number | null;
+  campusCode?: string | null;
+};
+
+export type CampusAdminRef = { id: number; fullName: string; email: string };
+
+export type NewCampusAdmin = { firstName: string; lastName: string; email: string; password: string };
+
+/* ------------------------------------------------------------------ */
+/* Academics                                                           */
+/* ------------------------------------------------------------------ */
+
+export type SessionStatus = "Planned" | "Active" | "Closed";
+export type ClassStage = "PrePrimary" | "Primary" | "Middle" | "Secondary" | "HigherSecondary";
+export type SubjectType = "Theory" | "Practical" | "Activity";
+export type SectionShift = "Morning" | "Afternoon" | "Evening";
+
+export const stageLabel: Record<ClassStage, string> = {
+  PrePrimary: "Pre-primary",
+  Primary: "Primary",
+  Middle: "Middle",
+  Secondary: "Secondary",
+  HigherSecondary: "Higher secondary",
+};
+
+export const shiftLabel: Record<SectionShift, string> = {
+  Morning: "Morning",
+  Afternoon: "Afternoon",
+  Evening: "Evening",
+};
+
+export type AcademicSession = Owned & {
+  id: number;
+  name: string;
+  startDate: string;
+  endDate: string;
+  status: SessionStatus;
+  isCurrent: boolean;
+  sectionCount: number;
+};
+
+export type AcademicSessionList = { items: AcademicSession[]; effectiveCurrentId?: number | null };
+
+export type SaveAcademicSessionRequest = {
+  name: string;
+  startDate: string;
+  endDate: string;
+  status: SessionStatus;
+  campusId?: number | null;
+};
+
+export type Subject = Owned & {
+  id: number;
+  code: string;
+  name: string;
+  type: SubjectType;
+  isActive: boolean;
+  classCount: number;
+};
+
+export type SaveSubjectRequest = {
+  code: string;
+  name: string;
+  type: SubjectType;
+  isActive: boolean;
+  campusId?: number | null;
+};
+
+export type SchoolClass = Owned & {
+  id: number;
+  code: string;
+  name: string;
+  stage: ClassStage;
+  displayOrder: number;
+  isActive: boolean;
+  subjectCount: number;
+  sectionCount: number;
+};
+
+export type ClassSubject = {
+  subjectId: number;
+  code: string;
+  name: string;
+  type: SubjectType;
+  isOptional: boolean;
+  displayOrder: number;
+};
+
+export type ClassDetail = { class: SchoolClass; subjects: ClassSubject[] };
+
+export type SaveClassRequest = {
+  code: string;
+  name: string;
+  stage: ClassStage;
+  displayOrder: number;
+  isActive: boolean;
+  campusId?: number | null;
+};
+
+export type Section = {
+  id: number;
+  campusId: number;
+  campusCode: string;
+  campusName: string;
+  academicSessionId: number;
+  sessionName: string;
+  classId: number;
+  classCode: string;
+  className: string;
+  classOrder: number;
+  name: string;
+  shift: SectionShift;
+  capacity?: number | null;
+  room?: string | null;
+  isActive: boolean;
+};
+
+export type SaveSectionRequest = {
+  classId: number;
+  academicSessionId?: number | null;
+  name: string;
+  shift: SectionShift;
+  capacity?: number | null;
+  room?: string | null;
+  isActive: boolean;
+  campusId?: number | null;
+};
+
+export type CopySectionsResult = { copied: number; skipped: number };
