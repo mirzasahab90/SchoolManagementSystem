@@ -12,6 +12,7 @@ import {
   PageHeader,
   Panel,
   SearchField,
+  Select,
   StatusPill,
   Switch,
   TableSkeleton,
@@ -21,6 +22,7 @@ import {
   Toolbar,
   Tr,
 } from "@/components/sms-ui";
+import { canWriteOwned, OwnerPill } from "@/components/owner-pill";
 import { useAuth } from "@/lib/auth";
 import { api, unwrap } from "@/lib/api";
 import type { ModulePermissionCell, RoleDetail, RoleListItem } from "@/lib/types";
@@ -52,11 +54,17 @@ export function RolesPage() {
   const [pendingDelete, setPendingDelete] = useState<RoleListItem | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Roles apply to every campus, so only HQ manages them (enforced by the API too).
+  // HQ roles are shared by every campus and only HQ changes them; a campus manages its own roles.
   const isHq = !!me?.isHq;
   const holdsRole = !!detail && !!me?.roles.includes(detail.name);
   const isSuperAdminRole = detail?.name === "SuperAdmin";
-  const canEdit = isHq && can("roles", "Edit") && (!holdsRole || !!me?.isSuperAdmin) && (!isSuperAdminRole || !!me?.isSuperAdmin);
+  const ownsDetail = !!detail && canWriteOwned(me, detail.campusId);
+  const canEdit =
+    ownsDetail && can("roles", "Edit") && (!holdsRole || !!me?.isSuperAdmin) && (!isSuperAdminRole || !!me?.isSuperAdmin);
+  const canAdd = can("roles", "Add") && (isHq || me?.activeCampusId != null);
+  const [newOwner, setNewOwner] = useState<string>("hq");
+  /** Outside HQ a role can only be given permissions its editor holds (the API enforces this too). */
+  const cellAllowed = (moduleKey: string, action: ActionKey) => isHq || can(moduleKey, action);
 
   async function load() {
     setLoading(true);
@@ -110,12 +118,22 @@ export function RolesPage() {
   }
 
   function setColumn(action: ActionKey, value: boolean) {
-    setMatrix((prev) => prev.map((row) => applyRule(row, action, value)));
+    setMatrix((prev) => prev.map((row) => (cellAllowed(row.moduleKey, action) ? applyRule(row, action, value) : row)));
   }
 
   function setRow(moduleKey: string, value: boolean) {
     setMatrix((prev) =>
-      prev.map((row) => (row.moduleKey === moduleKey ? { ...row, view: value, add: value, edit: value, delete: value } : row)),
+      prev.map((row) =>
+        row.moduleKey === moduleKey
+          ? {
+              ...row,
+              view: cellAllowed(moduleKey, "view") ? value : row.view,
+              add: cellAllowed(moduleKey, "add") ? value : row.add,
+              edit: cellAllowed(moduleKey, "edit") ? value : row.edit,
+              delete: cellAllowed(moduleKey, "delete") ? value : row.delete,
+            }
+          : row,
+      ),
     );
   }
 
@@ -139,7 +157,8 @@ export function RolesPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const created = (await unwrap(api.post("/roles", { name: newName, description: newDescription }))) as RoleDetail;
+      const campusId = isHq && me?.activeCampusId == null && newOwner !== "hq" ? Number(newOwner) : undefined;
+      const created = (await unwrap(api.post("/roles", { name: newName, description: newDescription, campusId }))) as RoleDetail;
       toast.success("Role created — now choose its permissions");
       setCreateOpen(false);
       setNewName("");
@@ -175,9 +194,9 @@ export function RolesPage() {
     <div>
       <PageHeader
         title="Roles & permissions"
-        description="Roles are templates shared by every campus. Choose which menus each role can view, add, edit or delete."
+        description="Roles decide what people can view, add, edit or delete. Head-office roles are shared by every campus; a campus can add its own."
         actions={
-          isHq && can("roles", "Add") ? (
+          canAdd ? (
             <Btn type="button" onClick={() => setCreateOpen(true)}>
               <Plus />
               Add role
@@ -189,7 +208,8 @@ export function RolesPage() {
       {!isHq ? (
         <div className="mb-5 flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--info-soft)] px-4 py-3 text-sm text-[var(--info)]">
           <Info className="mt-0.5 size-4 shrink-0" />
-          Roles apply to every campus, so only head office can change them. You can still see what each role allows.
+          Head-office roles (HQ) are shared by every campus and are read only for you. Add roles for your own campus when you need
+          something different.
         </div>
       ) : null}
 
@@ -210,6 +230,7 @@ export function RolesPage() {
             <THead
               columns={[
                 { label: "Role" },
+                { label: "Owner" },
                 { label: "Users" },
                 { label: "Permissions" },
                 { label: "Type" },
@@ -241,6 +262,9 @@ export function RolesPage() {
                       </div>
                     </div>
                   </Td>
+                  <Td>
+                    <OwnerPill campusCode={role.campusCode} locked={!canWriteOwned(me, role.campusId)} />
+                  </Td>
                   <Td className="tabular">{role.userCount}</Td>
                   <Td>
                     {role.name === "SuperAdmin" ? (
@@ -260,9 +284,9 @@ export function RolesPage() {
                   <Td align="right">
                     <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                       <Btn type="button" size="sm" variant="outline" onClick={() => openEdit(role.id)}>
-                        {isHq && can("roles", "Edit") ? "Permissions" : "View"}
+                        {canWriteOwned(me, role.campusId) && can("roles", "Edit") ? "Permissions" : "View"}
                       </Btn>
-                      {!role.isSystem && isHq && can("roles", "Delete") ? (
+                      {!role.isSystem && canWriteOwned(me, role.campusId) && can("roles", "Delete") ? (
                         <IconButton label={`Delete ${role.name}`} tone="danger" onClick={() => setPendingDelete(role)}>
                           <Trash2 />
                         </IconButton>
@@ -300,7 +324,13 @@ export function RolesPage() {
         }
       >
         <form id="role-form" className="space-y-5" onSubmit={saveRole}>
-          {!canEdit && isHq && holdsRole && !me?.isSuperAdmin ? (
+          {detail && !ownsDetail ? (
+            <div className="flex items-start gap-2.5 rounded-lg bg-[var(--info-soft)] px-3 py-2.5 text-sm text-[var(--info)]">
+              <Lock className="mt-0.5 size-4 shrink-0" />
+              Head-office role, shared by every campus. Only HQ can change it.
+            </div>
+          ) : null}
+          {ownsDetail && holdsRole && !me?.isSuperAdmin ? (
             <div className="flex items-start gap-2.5 rounded-lg bg-[var(--warning-soft)] px-3 py-2.5 text-sm text-[var(--warning)]">
               <Lock className="mt-0.5 size-4 shrink-0" />
               You hold this role, so you cannot change its permissions. Ask a SuperAdmin.
@@ -371,7 +401,8 @@ export function RolesPage() {
                               role="checkbox"
                               aria-checked={row[a.key]}
                               aria-label={`${a.label} ${row.moduleName}`}
-                              disabled={!canEdit}
+                              disabled={!canEdit || !cellAllowed(row.moduleKey, a.key)}
+                              title={canEdit && !cellAllowed(row.moduleKey, a.key) ? "You don't have this permission" : undefined}
                               onClick={() => toggle(row.moduleKey, a.key)}
                               className="inline-flex rounded p-1 outline-none focus-visible:ring-4 focus-visible:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-60"
                             >
@@ -417,6 +448,22 @@ export function RolesPage() {
           <Field label="Description">
             <TextInput value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="What this role is for" />
           </Field>
+          {isHq && me?.activeCampusId == null ? (
+            <Field label="Owner" hint="HQ roles are shared by every campus.">
+              <Select value={newOwner} onChange={(e) => setNewOwner(e.target.value)}>
+                <option value="hq">Head office (all campuses)</option>
+                {me?.campuses.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} only
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          ) : (
+            <p className="text-xs text-[var(--muted-foreground)]">
+              {isHq ? "This role will be shared by every campus." : "This role will belong to your campus only."}
+            </p>
+          )}
         </form>
       </Modal>
 

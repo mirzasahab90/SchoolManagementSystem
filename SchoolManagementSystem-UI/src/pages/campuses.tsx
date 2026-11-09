@@ -3,6 +3,7 @@ import { Building2, Mail, MapPin, Pencil, Phone, Plus, Trash2, UserRound, Users 
 import { toast } from "sonner";
 import { ConfirmDialog, Modal } from "@/components/modal";
 import {
+  Avatar,
   Btn,
   EmptyState,
   Field,
@@ -55,6 +56,8 @@ export function CampusesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Campus | null>(null);
+  const [withAdmin, setWithAdmin] = useState(false);
+  const [admin, setAdmin] = useState({ firstName: "", lastName: "", email: "", password: "" });
   const [deleting, setDeleting] = useState(false);
 
   async function load() {
@@ -86,6 +89,8 @@ export function CampusesPage() {
   function openCreate() {
     setEditingId(null);
     setForm(emptyForm);
+    setWithAdmin(false);
+    setAdmin({ firstName: "", lastName: "", email: "", password: "" });
     setOpen(true);
   }
 
@@ -124,6 +129,7 @@ export function CampusesPage() {
         establishedOn: form.establishedOn || null,
         studentCapacity:
           form.studentCapacity === null || Number.isNaN(Number(form.studentCapacity)) ? null : Number(form.studentCapacity),
+        admin: !editingId && withAdmin ? admin : null,
       };
       if (editingId) {
         await unwrap(api.put(`/campuses/${editingId}`, payload));
@@ -398,6 +404,40 @@ export function CampusesPage() {
             </div>
           </FormSection>
 
+          {!editingId ? (
+            <FormSection title="Campus admin (optional)" description="The person who runs this campus. They can manage its team and setup.">
+              <Switch
+                checked={withAdmin}
+                onChange={setWithAdmin}
+                label="Create the campus admin now"
+                description="You can also add one later from Users."
+              />
+              {withAdmin ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="First name" required>
+                    <TextInput value={admin.firstName} onChange={(e) => setAdmin({ ...admin, firstName: e.target.value })} required />
+                  </Field>
+                  <Field label="Last name" required>
+                    <TextInput value={admin.lastName} onChange={(e) => setAdmin({ ...admin, lastName: e.target.value })} required />
+                  </Field>
+                  <Field label="Email" required>
+                    <TextInput type="email" value={admin.email} onChange={(e) => setAdmin({ ...admin, email: e.target.value })} required />
+                  </Field>
+                  <Field label="Temporary password" required hint="They will be asked to change it on first sign-in.">
+                    <TextInput
+                      type="password"
+                      autoComplete="new-password"
+                      minLength={8}
+                      value={admin.password}
+                      onChange={(e) => setAdmin({ ...admin, password: e.target.value })}
+                      required
+                    />
+                  </Field>
+                </div>
+              ) : null}
+            </FormSection>
+          ) : null}
+
           <FormSection title="Other">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Established on">
@@ -489,6 +529,23 @@ function CampusCard({
           <InfoLine icon={campus.phone ? <Phone /> : <Mail />} value={campus.phone || campus.email} empty="No contact details" />
         </dl>
       </button>
+
+      <div className="flex items-center gap-2.5 border-t border-[var(--border)] px-5 py-2.5 text-xs">
+        {campus.admins?.length ? (
+          <>
+            <Avatar name={campus.admins[0].fullName} size="sm" />
+            <div className="min-w-0 leading-tight">
+              <div className="truncate font-medium">
+                {campus.admins[0].fullName}
+                {campus.admins.length > 1 ? <span className="text-[var(--muted-foreground)]"> +{campus.admins.length - 1}</span> : null}
+              </div>
+              <div className="truncate text-[var(--muted-foreground)]">Campus admin</div>
+            </div>
+          </>
+        ) : (
+          <span className="text-[var(--muted-foreground)] italic">No campus admin yet</span>
+        )}
+      </div>
 
       <div className="flex items-center justify-between border-t border-[var(--border)] px-5 py-2.5">
         <div className="flex items-center gap-4 text-xs text-[var(--muted-foreground)]">

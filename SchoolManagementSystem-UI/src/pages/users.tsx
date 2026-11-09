@@ -24,6 +24,7 @@ import {
   Toolbar,
   Tr,
 } from "@/components/sms-ui";
+import { OwnerPill } from "@/components/owner-pill";
 import { useAuth } from "@/lib/auth";
 import { api, unwrap } from "@/lib/api";
 import type { Campus, RoleListItem, SaveUserRequest, UserListItem } from "@/lib/types";
@@ -76,7 +77,7 @@ export function UsersPage() {
     try {
       const [users, roleList, campusList] = await Promise.all([
         unwrap(api.get("/users")) as Promise<UserListItem[]>,
-        unwrap(api.get("/roles")) as Promise<RoleListItem[]>,
+        unwrap(api.get("/roles?assignable=true")) as Promise<RoleListItem[]>,
         unwrap(api.get("/campuses")) as Promise<Campus[]>,
       ]);
       setItems(users);
@@ -103,8 +104,10 @@ export function UsersPage() {
     });
   }, [items, query, status]);
 
-  // Only a SuperAdmin may hand out the SuperAdmin role.
-  const assignableRoles = roles.filter((r) => r.name !== "SuperAdmin" || me?.isSuperAdmin);
+  // The API already returns only roles this user may hand out.
+  const assignableRoles = roles;
+  // A campus role pins the user to that one campus (the API enforces the same rule).
+  const pinnedCampusId = roles.find((r) => form.roleIds.includes(r.id) && r.campusId != null)?.campusId ?? null;
   const editingSelf = editingId != null && editingId === me?.id;
   const lockAccess = editingSelf && !me?.isSuperAdmin;
 
@@ -398,6 +401,12 @@ export function UsersPage() {
                   title={role.name}
                   description={role.description}
                   disabled={lockAccess}
+                  badge={
+                    <>
+                      <OwnerPill campusCode={role.campusCode} />
+                      {role.hqAssignOnly ? <StatusPill tone="warning">HQ only</StatusPill> : null}
+                    </>
+                  }
                 />
               ))}
             </div>
@@ -423,8 +432,10 @@ export function UsersPage() {
                   checked={form.isHq || form.campusIds.includes(campus.id)}
                   onToggle={() => setForm({ ...form, campusIds: toggleId(form.campusIds, campus.id) })}
                   title={campus.name}
-                  description={campus.code}
-                  disabled={form.isHq || lockAccess}
+                  description={
+                    pinnedCampusId != null && campus.id !== pinnedCampusId ? "Not allowed with a campus role" : campus.code
+                  }
+                  disabled={form.isHq || lockAccess || (pinnedCampusId != null && campus.id !== pinnedCampusId)}
                   badge={
                     !form.isHq && form.campusIds[0] === campus.id ? <StatusPill tone="primary">Primary</StatusPill> : null
                   }
