@@ -67,6 +67,7 @@ public class Startup(IConfiguration configuration, IWebHostEnvironment environme
         services.AddScoped<IAcademicSessionService, AcademicSessionService>();
         services.AddScoped<ISubjectService, SubjectService>();
         services.AddScoped<IClassService, ClassService>();
+        services.AddScoped<ISectionService, SectionService>();
         services.AddScoped<IDashboardService, DashboardService>();
 
         AddAuthentication(services);

@@ -482,6 +482,104 @@ def classes(hq):
     check("class detail lists its subjects", s == 200 and len(r["data"]["subjects"]) == 9, (s, r))
 
 
+# ------------------------------------------------------------------ sections
+
+def create_section(token, class_id_, name, campus=None, **extra):
+    body = {"classId": class_id_, "name": name, "shift": "Morning", "capacity": 30, "room": None, "isActive": True}
+    body.update(extra)
+    s, r = call("POST", "/sections", body, token=token, campus=campus)
+    if s == 200:
+        track("sections", r["data"]["id"])
+    return s, r
+
+
+def section_body(sec, **changes):
+    body = {k: sec.get(k) for k in ("classId", "academicSessionId", "name", "shift", "capacity", "room", "isActive")}
+    body.update(changes)
+    return body
+
+
+@group
+def sections(hq):
+    a, b = demo_campuses(hq)
+    _, ca = campus_admin(hq, a)
+    _, cb = campus_admin(hq, b)
+    g6 = class_id(hq, "G6")
+
+    s, r = create_section(ca, g6, "QA", campus=a, shift="Afternoon")
+    check("campus admin creates section in own campus", s == 200 and r["data"]["campusId"] == a
+          and r["data"]["sessionName"] == "2026-27" and r["data"]["shift"] == "Afternoon", (s, r))
+    qa_sec = r["data"] if s == 200 else None
+    rows = data(call("GET", "/sections", token=ca, campus=a))
+    check("campus admin lists only own campus sections", rows and all(x["campusId"] == a for x in rows), len(rows or []))
+    s, r = create_section(ca, g6, "qa", campus=a)
+    check("duplicate section name -> 409", s == 409, (s, r))
+
+    b_sec = next(x for x in data(call("GET", "/sections", token=hq, campus=b)))
+    s, r = call("PUT", f"/sections/{b_sec['id']}", section_body(b_sec, name="HACK"), token=ca, campus=a)
+    check("cannot edit another campus's section (404)", s == 404, (s, r))
+    s, r = call("DELETE", f"/sections/{b_sec['id']}", token=ca, campus=a)
+    check("cannot delete another campus's section (404)", s == 404, (s, r))
+    still = next(x for x in data(call("GET", "/sections", token=hq, campus=b)) if x["id"] == b_sec["id"])
+    check("other campus's section unchanged", still["name"] == b_sec["name"], still)
+
+    s, r = create_section(ca, g6, "QB", campus=a, campusId=b)
+    check("cannot create on another campus", s == 403, (s, r))
+    s, r = create_section(hq, g6, "QH")
+    check("HQ on All campuses must pick a campus", s == 400 and "Select a campus." in str(r), (s, r))
+    s, r = create_section(hq, g6, "QH", campusId=b)
+    check("HQ creates section on a chosen campus", s == 200 and r["data"]["campusId"] == b, (s, r))
+
+    s, r = create_class(cb, "QBK", campus=b)
+    if s == 200:
+        s, r = create_section(ca, r["data"]["id"], "QX", campus=a)
+        check("section with another campus's class -> 400", s == 400, (s, r))
+    s, r = create_session(cb, session_body("QA-B", "2099-04-01", "2100-03-31"), campus=b)
+    if s == 200:
+        s, r = create_section(ca, g6, "QY", campus=a, academicSessionId=r["data"]["id"])
+        check("section with another campus's session refused (400/404)", s in (400, 404), (s, r))
+
+    s, r = create_class(hq, "QIN", isActive=False)
+    if s == 200:
+        s, r = create_section(ca, r["data"]["id"], "QZ", campus=a)
+        check("section on inactive class -> 400", s == 400, (s, r))
+
+    s, r = create_section(ca, g6, "QC", campus=a)
+    if s == 200 and qa_sec:
+        s, r = call("PUT", f"/sections/{r['data']['id']}", section_body(r["data"], name="QA"), token=ca, campus=a)
+        check("renaming into an existing section -> 409", s == 409, (s, r))
+
+    # copy from the current session into a temporary HQ session
+    current = hq_current_id(hq)
+    s, r = create_session(hq, session_body("QA-COPY", "2098-04-01", "2099-03-31"))
+    target = r["data"]["id"] if s == 200 else None
+    if target:
+        own = [x for x in data(call("GET", f"/sections?sessionId={current}", token=ca, campus=a)) if x["isActive"]]
+        n = len(own)
+        s, r = call("POST", "/sections/copy", {"fromSessionId": current, "toSessionId": target, "dryRun": True}, token=ca, campus=a)
+        check("copy dry run counts sections", s == 200 and r["data"]["copied"] == n, (s, r, n))
+        s, r = call("POST", "/sections/copy", {"fromSessionId": current, "toSessionId": target, "dryRun": False}, token=ca, campus=a)
+        check("copy creates the sections", s == 200 and r["data"]["copied"] == n, (s, r, n))
+        copied = data(call("GET", f"/sections?sessionId={target}", token=ca, campus=a)) or []
+        for x in copied:
+            track("sections", x["id"])
+        s, r = call("POST", "/sections/copy", {"fromSessionId": current, "toSessionId": target, "dryRun": False}, token=ca, campus=a)
+        check("second copy skips existing", s == 200 and r["data"]["copied"] == 0 and r["data"]["skipped"] == n, (s, r))
+        s, r = call("POST", "/sections/copy", {"fromSessionId": current, "toSessionId": current, "dryRun": True}, token=ca, campus=a)
+        check("copy into the same session -> 400", s == 400, (s, r))
+
+        call("PUT", f"/academic-sessions/{target}", session_body("QA-COPY", "2098-04-01", "2099-03-31", "Closed"), token=hq)
+        s, r = call("POST", "/sections/copy", {"fromSessionId": current, "toSessionId": target, "dryRun": True}, token=ca, campus=a)
+        check("copy into a closed session -> 400", s == 400 and "This session is closed." in str(r), (s, r))
+        if copied:
+            sec = copied[0]
+            s, r = call("PUT", f"/sections/{sec['id']}", section_body(sec, room="R1"), token=ca, campus=a)
+            check("closed session locks section edits", s == 400, (s, r))
+            s, r = call("DELETE", f"/sections/{sec['id']}", token=ca, campus=a)
+            check("closed session locks section deletes", s == 400, (s, r))
+        call("PUT", f"/academic-sessions/{target}", session_body("QA-COPY", "2098-04-01", "2099-03-31", "Planned"), token=hq)
+
+
 # ------------------------------------------------------------------ runner
 
 def main(argv):
