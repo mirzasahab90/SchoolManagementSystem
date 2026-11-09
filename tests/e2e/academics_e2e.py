@@ -418,6 +418,70 @@ def subjects(hq):
     check("campus admin cannot change HQ subject", s == 403, (s, r))
 
 
+# ------------------------------------------------------------------ classes
+
+def create_class(token, code, campus=None, **extra):
+    body = {"code": code, "name": f"QA {code}", "stage": "Middle", "displayOrder": 99, "isActive": True}
+    body.update(extra)
+    s, r = call("POST", "/classes", body, token=token, campus=campus)
+    if s == 200:
+        r["data"] = dict(r["data"]["class"], subjects=r["data"]["subjects"])  # flatten ClassDetailDto
+        track("classes", r["data"]["id"])
+    return s, r
+
+
+def class_id(token, code, campus=None):
+    return next(x["id"] for x in data(call("GET", "/classes", token=token, campus=campus)) if x["code"] == code)
+
+
+@group
+def classes(hq):
+    a, b = demo_campuses(hq)
+    _, ca = campus_admin(hq, a)
+    _, cb = campus_admin(hq, b)
+    eng, art, math = (subject_id(hq, c) for c in ("ENG", "ART", "MATH"))
+
+    s, r = create_class(hq, "qa9")
+    check("HQ creates class, code upper-cased", s == 200 and r["data"]["code"] == "QA9", (s, r))
+    qa9 = r["data"]["id"] if s == 200 else None
+    s, r = create_class(hq, "QA9")
+    check("duplicate class code -> 409", s == 409, (s, r))
+    if qa9:
+        s, r = call("PUT", f"/classes/{qa9}/subjects", [{"subjectId": eng, "isOptional": False}, {"subjectId": art, "isOptional": True}], token=hq)
+        subs = r["data"]["subjects"] if s == 200 else []
+        check("set subjects in order with optional flags", [(x["code"], x["isOptional"]) for x in subs]
+              == [("ENG", False), ("ART", True)], (s, r))
+        s, r = call("PUT", f"/classes/{qa9}/subjects", [{"subjectId": math, "isOptional": False}], token=hq)
+        check("set subjects replaces the list", s == 200 and [x["code"] for x in r["data"]["subjects"]] == ["MATH"], (s, r))
+        s, r = call("PUT", f"/classes/{qa9}/subjects", [{"subjectId": 999999, "isOptional": False}], token=hq)
+        check("unknown subject -> 400", s == 400, (s, r))
+        s, r = call("PUT", f"/classes/{qa9}/subjects", [{"subjectId": eng, "isOptional": False}] * 2, token=hq)
+        check("duplicate subject -> 400", s == 400, (s, r))
+
+    s, r = create_subject(ca, "QAS", campus=a)
+    qas = r["data"]["id"] if s == 200 else None
+    s, r = create_subject(cb, "QBS", campus=b)
+    qbs = r["data"]["id"] if s == 200 else None
+    s, r = create_class(ca, "QAK", campus=a)
+    qak = r["data"]["id"] if s == 200 else None
+    check("campus admin creates campus class", qak is not None and r["data"].get("campusCode"), (s, r))
+    if qak and qas:
+        s, r = call("PUT", f"/classes/{qak}/subjects", [{"subjectId": eng, "isOptional": False}, {"subjectId": qas, "isOptional": True}],
+                    token=ca, campus=a)
+        check("campus class maps HQ + own subjects", s == 200 and len(r["data"]["subjects"]) == 2, (s, r))
+    if qak and qbs:
+        s, r = call("PUT", f"/classes/{qak}/subjects", [{"subjectId": qbs, "isOptional": False}], token=hq)
+        check("campus class rejects another campus's subject", s == 400, (s, r))
+
+    g1 = class_id(hq, "G1")
+    s, r = call("PUT", f"/classes/{g1}/subjects", [{"subjectId": eng, "isOptional": False}], token=ca, campus=a)
+    check("campus admin cannot change HQ class subjects", s == 403, (s, r))
+    s, r = call("DELETE", f"/classes/{g1}", token=hq)
+    check("used class cannot be deleted", s == 400, (s, r))
+    s, r = call("GET", f"/classes/{g1}", token=hq)
+    check("class detail lists its subjects", s == 200 and len(r["data"]["subjects"]) == 9, (s, r))
+
+
 # ------------------------------------------------------------------ runner
 
 def main(argv):
