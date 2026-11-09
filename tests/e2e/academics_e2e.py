@@ -648,6 +648,23 @@ def review_fixes(hq):
           and call("GET", "/auth/me", token=fresh)[0] == 200, (s, r))
 
 
+# ------------------------------------------------------------------ password-gate
+
+@group
+def password_gate(hq):
+    a, _ = demo_campuses(hq)
+    _, email, pw = make_user(hq, campus_ids=[a], role_names=["Teacher"], must_change=True)
+    t = login(email, pw)["tokens"]["accessToken"]
+    s, r = call("GET", "/dashboard", token=t)
+    check("temporary password cannot use the API", s == 403 and "change your password" in str(r).lower(), (s, r))
+    s, _ = call("GET", "/auth/me", token=t)
+    check("auth endpoints still work before the change", s == 200, s)
+    s, r = call("POST", "/auth/change-password", {"currentPassword": pw, "newPassword": temp_password()}, token=t)
+    fresh = r["data"]["tokens"]["accessToken"] if s == 200 else t
+    s, r = call("GET", "/dashboard", token=fresh)
+    check("API opens after the password is changed", s == 200, (s, r))
+
+
 # ------------------------------------------------------------------ runner
 
 def main(argv):

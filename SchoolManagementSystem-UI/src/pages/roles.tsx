@@ -188,6 +188,11 @@ export function RolesPage() {
   }
 
   const grantedCount = matrix.reduce((sum, row) => sum + ACTIONS.filter((a) => row[a.key]).length, 0);
+  // Ticked permissions the editor does not hold (e.g. added by HQ). The API refuses to save these, so the
+  // editor must untick them or ask HQ — say so instead of failing on save.
+  const beyondMe = canEdit
+    ? matrix.flatMap((row) => ACTIONS.filter((a) => row[a.key] && !cellAllowed(row.moduleKey, a.key)).map((a) => `${row.moduleName} ${a.label}`))
+    : [];
   const totalCells = matrix.length * ACTIONS.length;
 
   return (
@@ -316,7 +321,7 @@ export function RolesPage() {
               {canEdit ? "Cancel" : "Close"}
             </Btn>
             {canEdit ? (
-              <Btn type="submit" form="role-form" disabled={saving}>
+              <Btn type="submit" form="role-form" disabled={saving || beyondMe.length > 0}>
                 {saving ? "Saving…" : "Save permissions"}
               </Btn>
             ) : null}
@@ -334,6 +339,15 @@ export function RolesPage() {
             <div className="flex items-start gap-2.5 rounded-lg bg-[var(--warning-soft)] px-3 py-2.5 text-sm text-[var(--warning)]">
               <Lock className="mt-0.5 size-4 shrink-0" />
               You hold this role, so you cannot change its permissions. Ask a SuperAdmin.
+            </div>
+          ) : null}
+          {beyondMe.length > 0 ? (
+            <div className="flex items-start gap-2.5 rounded-lg bg-[var(--warning-soft)] px-3 py-2.5 text-sm text-[var(--warning)]">
+              <Lock className="mt-0.5 size-4 shrink-0" />
+              <span>
+                This role has permissions you don&apos;t have ({beyondMe.join(", ")}), probably added by head office. Untick them to
+                save your changes, or ask HQ to make the change.
+              </span>
             </div>
           ) : null}
 
@@ -401,7 +415,8 @@ export function RolesPage() {
                               role="checkbox"
                               aria-checked={row[a.key]}
                               aria-label={`${a.label} ${row.moduleName}`}
-                              disabled={!canEdit || !cellAllowed(row.moduleKey, a.key)}
+                              // A permission the editor lacks can be removed, never added.
+                              disabled={!canEdit || (!cellAllowed(row.moduleKey, a.key) && !row[a.key])}
                               title={canEdit && !cellAllowed(row.moduleKey, a.key) ? "You don't have this permission" : undefined}
                               onClick={() => toggle(row.moduleKey, a.key)}
                               className="inline-flex rounded p-1 outline-none focus-visible:ring-4 focus-visible:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-60"

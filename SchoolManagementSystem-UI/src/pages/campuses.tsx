@@ -551,7 +551,7 @@ function CampusCard({
         <div className="flex items-center gap-4 text-xs text-[var(--muted-foreground)]">
           <span className="flex items-center gap-1.5">
             <Users className="size-3.5" />
-            <span className="tabular">{campus.adminUserCount}</span> users
+            <span className="tabular">{campus.adminUserCount}</span> {campus.adminUserCount === 1 ? "user" : "users"}
           </span>
           {campus.studentCapacity ? (
             <span>

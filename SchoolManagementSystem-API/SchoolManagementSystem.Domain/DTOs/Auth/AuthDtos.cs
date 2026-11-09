@@ -31,7 +31,7 @@ public record CurrentUserDto(
     IReadOnlyDictionary<string, IReadOnlyList<string>> Permissions);
 
 /// <summary>Database view of what campuses a user may work in (HQ = every campus).</summary>
-public record UserCampusAccessDto(bool IsHq, bool IsSuperAdmin, IReadOnlyList<int> CampusIds);
+public record UserCampusAccessDto(bool IsHq, bool IsSuperAdmin, IReadOnlyList<int> CampusIds, bool MustChangePassword = false);
 
 public record UserAccessDto(bool IsSuperAdmin, IReadOnlyList<string> Roles, IReadOnlyDictionary<string, HashSet<string>> ModuleActions)
 {

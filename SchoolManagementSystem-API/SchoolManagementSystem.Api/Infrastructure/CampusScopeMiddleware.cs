@@ -35,6 +35,15 @@ public class CampusScopeMiddleware(RequestDelegate next)
             return;
         }
 
+        // A temporary password only opens the auth endpoints (me, change-password, logout).
+        if (access.MustChangePassword && !context.Request.Path.StartsWithSegments("/api/auth"))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsJsonAsync(
+                new ResponseDto<object>(null, 403, "Change your password before continuing."), ct);
+            return;
+        }
+
         var assigned = access.CampusIds.ToHashSet();
         int? active = access.IsHq ? null : access.CampusIds.Count > 0 ? access.CampusIds[0] : null;
 

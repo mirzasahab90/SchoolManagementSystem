@@ -44,7 +44,7 @@ public class AccessRepository(SchoolManagementSystemDbContext dbContext) : BaseR
     {
         var user = await Db.Users.AsNoTracking()
             .Where(u => u.Id == userId && u.IsActive)
-            .Select(u => new { u.IsHq })
+            .Select(u => new { u.IsHq, u.MustChangePassword })
             .FirstOrDefaultAsync(ct);
         if (user == null)
         {
@@ -64,7 +64,7 @@ public class AccessRepository(SchoolManagementSystemDbContext dbContext) : BaseR
             .Select(uc => uc.CampusId)
             .ToListAsync(ct);
 
-        return new UserCampusAccessDto(user.IsHq || isSuperAdmin, isSuperAdmin, campusIds);
+        return new UserCampusAccessDto(user.IsHq || isSuperAdmin, isSuperAdmin, campusIds, user.MustChangePassword);
     }
 
     public Task<List<Module>> GetActiveModulesAsync(CancellationToken ct = default) =>
