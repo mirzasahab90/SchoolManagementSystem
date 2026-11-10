@@ -1,13 +1,13 @@
 import { Lock } from "lucide-react";
 import { StatusPill } from "@/components/sms-ui";
 
-/** Shows who owns a row: head office (shared by every campus) or one campus. */
+/** Shows who owns a row: Main Campus (shared by every campus) or one campus. */
 export function OwnerPill({ campusCode, locked }: { campusCode?: string | null; locked?: boolean }) {
   if (!campusCode) {
     return (
       <StatusPill tone="info">
         {locked ? <Lock className="size-3" /> : null}
-        HQ
+        Main Campus
       </StatusPill>
     );
   }

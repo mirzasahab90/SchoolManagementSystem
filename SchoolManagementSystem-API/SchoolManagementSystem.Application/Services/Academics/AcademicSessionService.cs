@@ -97,7 +97,7 @@ public class AcademicSessionService(SchoolManagementSystemRepositories repositor
             }
 
             await repositories.SaveChangesAsync(ct);
-            return Result.Ok("Following the head-office session.");
+            return Result.Ok("Following the Main Campus session.");
         }
 
         var writeError = Ownership.CheckWrite(currentUser, session.CampusId, "Session");

@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { Btn, Field, TextInput } from "@/components/sms-ui";
 
 const highlights = [
-  { icon: Building2, title: "Every campus, one place", text: "Switch between branches or see them all from head office." },
+  { icon: Building2, title: "Every campus, one place", text: "Switch between branches or see them all from Main Campus." },
   { icon: ShieldCheck, title: "Access that stays in its lane", text: "Campus teams only see their own campus data." },
   { icon: Sparkles, title: "Roles you control", text: "Decide who can view, add, edit or delete — per menu." },
 ];

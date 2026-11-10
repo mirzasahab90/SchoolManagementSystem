@@ -20,4 +20,8 @@ public class Section : AuditableEntity, ICampusScoped
     public int? Capacity { get; set; }
     public string? Room { get; set; }
     public bool IsActive { get; set; } = true;
+
+    /// <summary>Staff member who is this section's class teacher.</summary>
+    public int? ClassTeacherStaffId { get; set; }
+    public Hiring.Staff? ClassTeacher { get; set; }
 }

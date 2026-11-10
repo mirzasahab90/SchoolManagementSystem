@@ -113,7 +113,7 @@ public class UserService(
             var sameCampuses = user.UserCampuses.Select(c => c.CampusId).ToHashSet().SetEquals(request.CampusIds);
             if (!currentUser.IsSuperAdmin && (!sameRoles || !sameCampuses || user.IsHq != request.IsHq))
             {
-                return Error.Forbidden("You cannot change your own roles, campuses or HQ access.");
+                return Error.Forbidden("You cannot change your own roles, campuses or Main Campus access.");
             }
         }
 
@@ -163,6 +163,13 @@ public class UserService(
     }
 
     /// <summary>May the current user change or delete this existing user?</summary>
+    public async Task<Error?> CheckCanManageAsync(int userId, CancellationToken ct = default)
+    {
+        var user = await repositories.Users.GetWithRolesAndCampusesAsync(userId, ct);
+        if (user == null) return Error.NotFound("User");
+        return await GuardTargetAsync(user, ct);
+    }
+
     private async Task<Error?> GuardTargetAsync(User target, CancellationToken ct)
     {
         if (!currentUser.IsHq)
@@ -176,7 +183,7 @@ public class UserService(
 
             if (target.UserCampuses.Any(c => !allowed.Contains(c.CampusId)))
             {
-                return Error.Forbidden("This user also belongs to campuses you do not manage. Ask HQ to change them.");
+                return Error.Forbidden("This user also belongs to campuses you do not manage. Ask Main Campus to change them.");
             }
         }
 
@@ -186,7 +193,7 @@ public class UserService(
             var targetRoles = await repositories.Users.GetRolesByIdsAsync(targetRoleIds, ct);
             if (targetRoles.Any(r => r.HqAssignOnly))
             {
-                return Error.Forbidden("Only HQ can change or remove a campus admin.");
+                return Error.Forbidden("Only Main Campus can change or remove a campus admin.");
             }
 
             if (!await WithinMyAccessAsync(targetRoleIds, ct))
@@ -248,7 +255,7 @@ public class UserService(
 
         if (roles.Any(r => r.HqAssignOnly) && !currentUser.IsHq)
         {
-            return Error.Forbidden("Only HQ can assign this role.");
+            return Error.Forbidden("Only Main Campus can assign this role.");
         }
 
         // No escalation: outside HQ, the roles given must not carry permissions the editor lacks.
@@ -269,12 +276,12 @@ public class UserService(
 
         if (request.IsHq && !currentUser.IsHq)
         {
-            return Error.Forbidden("Only HQ users can grant HQ access.");
+            return Error.Forbidden("Only Main Campus users can grant Main Campus access.");
         }
 
         if (!request.IsHq && request.CampusIds.Count == 0)
         {
-            return Error.Validation("Assign at least one campus, or mark the user as HQ.");
+            return Error.Validation("Assign at least one campus, or give the user Main Campus access.");
         }
 
         if (request.CampusIds.Count > 0)

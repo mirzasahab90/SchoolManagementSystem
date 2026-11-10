@@ -19,7 +19,7 @@ public class RoleService(
     IPermissionChecker permissionChecker,
     ICurrentUser currentUser) : IRoleService
 {
-    private static readonly Error HqItem = Error.Forbidden("Only HQ can change head-office items.");
+    private static readonly Error HqItem = Error.Forbidden("Only Main Campus can change Main Campus items.");
 
     public async Task<Result<IReadOnlyList<RoleListItemDto>>> ListAsync(bool assignableOnly = false, CancellationToken ct = default)
     {

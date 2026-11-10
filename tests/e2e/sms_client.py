@@ -102,7 +102,7 @@ def summary():
 
 # ---------------------------------------------------------------- cleanup
 
-_created = {"sections": [], "users": [], "roles": [], "classes": [], "subjects": [], "academic-sessions": [], "campuses": []}
+_created = {"exams": [], "holidays": [], "staff": [], "candidates": [], "vacancies": [], "students": [], "sections": [], "users": [], "roles": [], "classes": [], "subjects": [], "academic-sessions": [], "campuses": []}
 
 
 def track(kind, ident):
@@ -112,9 +112,10 @@ def track(kind, ident):
 
 def cleanup(token):
     """Delete tracked rows in dependency order (sections first, campuses last)."""
-    for kind in ["sections", "users", "roles", "classes", "subjects", "academic-sessions", "campuses"]:
+    for kind in ["exams", "holidays", "staff", "candidates", "vacancies", "students", "sections", "users", "roles", "classes", "subjects", "academic-sessions", "campuses"]:
         for ident in reversed(_created[kind]):
-            status, _ = call("DELETE", f"/{kind}/{ident}", token=token)
+            route = "calendar/holidays" if kind == "holidays" else kind
+            status, _ = call("DELETE", f"/{route}/{ident}", token=token)
             if status not in (200, 404):
                 print(f"  cleanup: DELETE /{kind}/{ident} -> {status}")
         _created[kind].clear()
@@ -153,3 +154,44 @@ def demo_campuses(token):
     campuses = data(call("GET", "/campuses", token=token)) or []
     campuses.sort(key=lambda c: c["id"])
     return campuses[0]["id"], campuses[1]["id"]
+
+
+# ---------------------------------------------------------------- files
+
+def upload(path, fields, file_field, filename, content, content_type, token, campus=None):
+    """POST a multipart/form-data body built by hand (stdlib only)."""
+    boundary = "----smsboundary" + secrets.token_hex(8)
+    parts = []
+    for name, value in fields.items():
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode())
+    parts.append((f'--{boundary}\r\nContent-Disposition: form-data; name="{file_field}"; filename="{filename}"\r\n'
+                  f"Content-Type: {content_type}\r\n\r\n").encode() + content + b"\r\n")
+    parts.append(f"--{boundary}--\r\n".encode())
+    req = urllib.request.Request(BASE + path, data=b"".join(parts), method="POST")
+    req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+    req.add_header("Authorization", "Bearer " + token)
+    if campus is not None:
+        req.add_header("X-Campus-Id", str(campus))
+    try:
+        with urllib.request.urlopen(req, context=_CTX) as r:
+            raw = r.read()
+            return r.status, json.loads(raw) if raw else None
+    except urllib.error.HTTPError as e:
+        raw = e.read()
+        try:
+            return e.code, json.loads(raw)
+        except Exception:
+            return e.code, raw.decode(errors="replace")
+
+
+def download(path, token, campus=None):
+    """GET raw bytes; returns (status, bytes, headers)."""
+    req = urllib.request.Request(BASE + path, method="GET")
+    req.add_header("Authorization", "Bearer " + token)
+    if campus is not None:
+        req.add_header("X-Campus-Id", str(campus))
+    try:
+        with urllib.request.urlopen(req, context=_CTX) as r:
+            return r.status, r.read(), dict(r.headers)
+    except urllib.error.HTTPError as e:
+        return e.code, e.read(), dict(e.headers)

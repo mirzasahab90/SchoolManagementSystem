@@ -1,6 +1,6 @@
 import { useEffect, useState, type ComponentType } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowUpRight, Building2, Globe2, GraduationCap, KeyRound, Plus, Shield, ShieldCheck, UserPlus, Users } from "lucide-react";
+import { ArrowUpRight, Briefcase, CalendarCheck, Building2, Globe2, GraduationCap, KeyRound, Plus, Shield, ShieldCheck, UserPlus, Users, FilePen } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, KpiCard, KpiGrid, PageHeader, Panel, Skeleton, StatusPill, type StatusTone } from "@/components/sms-ui";
 import { useAuth } from "@/lib/auth";
@@ -16,11 +16,16 @@ const kpiStyle: Record<string, { icon: Icon; accent: StatusTone }> = {
   roles: { icon: Shield, accent: "warning" },
   hq: { icon: Globe2, accent: "success" },
   academics: { icon: GraduationCap, accent: "primary" },
+  students: { icon: Users, accent: "info" },
+  hiring: { icon: Briefcase, accent: "warning" },
+  attendance: { icon: CalendarCheck, accent: "success" },
+  exams: { icon: FilePen, accent: "primary" },
 };
 
 const actionIcon: Record<string, Icon> = {
   "add-campus": Plus,
   "add-user": UserPlus,
+  admit: GraduationCap,
   roles: KeyRound,
 };
 
@@ -186,7 +191,7 @@ export function DashboardPage() {
                     {user.isSuperAdmin ? (
                       <StatusPill tone="primary">Super admin</StatusPill>
                     ) : user.isHq ? (
-                      <StatusPill tone="info">Head office</StatusPill>
+                      <StatusPill tone="info">Main Campus</StatusPill>
                     ) : (
                       <StatusPill>Campus</StatusPill>
                     )}

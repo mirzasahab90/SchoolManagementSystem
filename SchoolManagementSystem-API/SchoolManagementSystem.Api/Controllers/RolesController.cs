@@ -11,7 +11,7 @@ namespace SchoolManagementSystem.Api.Controllers;
 public class RolesController(IRoleService roleService) : ApiControllerBase
 {
     [HttpGet]
-    [HasPermission(AppModules.Roles, AppActions.View)]
+    [HasAnyPermission("roles:View", "users:Add", "users:Edit")]
     public async Task<ActionResult<ResponseDto<IReadOnlyList<RoleListItemDto>>>> List([FromQuery] bool assignable, CancellationToken ct) =>
         FromResult(await roleService.ListAsync(assignable, ct));
 

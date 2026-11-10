@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SchoolManagementSystem.Domain.DTOs.Academics;
 using SchoolManagementSystem.Domain.Entities.Academics;
+using SchoolManagementSystem.Domain.Entities.Students;
 using SchoolManagementSystem.Infrastructure;
 
 namespace SchoolManagementSystem.Application.Repository;
@@ -14,7 +15,10 @@ public class SectionRepository(SchoolManagementSystemDbContext dbContext) : Base
             .OrderBy(s => s.Campus.Name).ThenBy(s => s.Class.DisplayOrder).ThenBy(s => s.Name)
             .Select(s => new SectionDto(
                 s.Id, s.CampusId, s.Campus.Code, s.Campus.Name, s.AcademicSessionId, s.AcademicSession.Name,
-                s.ClassId, s.Class.Code, s.Class.Name, s.Class.DisplayOrder, s.Name, s.Shift, s.Capacity, s.Room, s.IsActive))
+                s.ClassId, s.Class.Code, s.Class.Name, s.Class.DisplayOrder, s.Name, s.Shift, s.Capacity, s.Room, s.IsActive,
+                Db.Enrollments.Count(e => e.SectionId == s.Id && e.Status == EnrollmentStatus.Active),
+                s.ClassTeacherStaffId,
+                s.ClassTeacher != null ? s.ClassTeacher.FirstName + " " + s.ClassTeacher.LastName : null))
             .ToListAsync(ct);
 
     public async Task<SectionDto?> GetDtoAsync(int id, CancellationToken ct = default)

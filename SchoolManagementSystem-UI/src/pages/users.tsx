@@ -9,9 +9,12 @@ import {
   DataTable,
   EmptyState,
   Field,
+  FilterBar,
   FormSection,
   IconButton,
+  NoResults,
   PageHeader,
+  Pagination,
   Panel,
   SearchField,
   Select,
@@ -21,12 +24,12 @@ import {
   Td,
   TextInput,
   THead,
-  Toolbar,
   Tr,
 } from "@/components/sms-ui";
 import { OwnerPill } from "@/components/owner-pill";
 import { useAuth } from "@/lib/auth";
 import { api, unwrap } from "@/lib/api";
+import { matches, pageOf, sortRows, useUrlFilters, type SortDir } from "@/lib/filters";
 import type { Campus, RoleListItem, SaveUserRequest, UserListItem } from "@/lib/types";
 
 const emptyForm: SaveUserRequest = {
@@ -40,8 +43,6 @@ const emptyForm: SaveUserRequest = {
   campusIds: [],
   password: "",
 };
-
-type StatusFilter = "all" | "active" | "inactive";
 
 function formatLastLogin(value?: string | null) {
   if (!value) return "Never";
@@ -65,8 +66,18 @@ export function UsersPage() {
   const [form, setForm] = useState<SaveUserRequest>(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<StatusFilter>("all");
+  const { values: f, set, clear, activeCount: filterCount } = useUrlFilters({
+    q: "",
+    status: "",
+    roleId: "",
+    campusId: "",
+    sort: "",
+    dir: "asc",
+    page: "1",
+    pageSize: "25",
+  });
+  const page = Number(f.page) || 1;
+  const pageSize = Number(f.pageSize) || 25;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<UserListItem | null>(null);
@@ -94,15 +105,31 @@ export function UsersPage() {
     void load();
   }, []);
 
+  // Role filter options come from the users themselves, so roles this user cannot hand out still show.
+  const roleOptions = useMemo(() => {
+    const byId = new Map<number, string>();
+    for (const u of items) for (const r of u.roles) byId.set(r.id, r.name);
+    return [...byId].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [items]);
+
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return items.filter((u) => {
-      if (status === "active" && !u.isActive) return false;
-      if (status === "inactive" && u.isActive) return false;
-      if (!q) return true;
-      return [u.fullName, u.email, u.roles.map((r) => r.name).join(" ")].join(" ").toLowerCase().includes(q);
+    const rows = items.filter((u) => {
+      if (f.status === "active" && !u.isActive) return false;
+      if (f.status === "inactive" && u.isActive) return false;
+      if (f.roleId && !u.roles.some((r) => String(r.id) === f.roleId)) return false;
+      if (f.campusId === "hq" && !u.isHq) return false;
+      if (f.campusId && f.campusId !== "hq" && !u.isHq && !u.campusIds.includes(Number(f.campusId))) return false;
+      return matches(f.q, u.fullName, u.email, u.phone, u.roles.map((r) => r.name).join(" "));
     });
-  }, [items, query, status]);
+    const pick =
+      f.sort === "name"
+        ? (u: UserListItem) => u.fullName
+        : f.sort === "lastLogin"
+          ? (u: UserListItem) => (u.lastLoginOn ? new Date(u.lastLoginOn).getTime() : null)
+          : undefined;
+    return sortRows(rows, pick, f.dir as SortDir);
+  }, [items, f.status, f.roleId, f.campusId, f.q, f.sort, f.dir]);
+  const visible = useMemo(() => pageOf(filtered, page, pageSize), [filtered, page, pageSize]);
 
   // The API already returns only roles this user may hand out.
   const assignableRoles = roles;
@@ -144,7 +171,7 @@ export function UsersPage() {
       return;
     }
     if (!form.isHq && form.campusIds.length === 0) {
-      toast.error("Select at least one campus, or enable HQ access");
+      toast.error("Select at least one campus, or enable Main Campus access");
       return;
     }
     setSaving(true);
@@ -185,13 +212,12 @@ export function UsersPage() {
   }
 
   const campusCodes = (ids: number[]) => ids.map((id) => campuses.find((c) => c.id === id)?.code).filter(Boolean) as string[];
-  const activeCount = items.filter((u) => u.isActive).length;
 
   return (
     <div>
       <PageHeader
         title="Users"
-        description="Logins for head office and campus staff. Roles decide what they can do; campuses decide where."
+        description="Logins for Main Campus and campus staff. Roles decide what they can do; campuses decide where."
         actions={
           can("users", "Add") ? (
             <Btn type="button" onClick={openCreate}>
@@ -203,37 +229,55 @@ export function UsersPage() {
       />
 
       <Panel flush>
-        <Toolbar>
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-            <SearchField value={query} onChange={setQuery} placeholder="Search name, email or role" />
-            <Select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as StatusFilter)}
-              aria-label="Filter by status"
-              className="w-auto"
-            >
-              <option value="all">All statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </Select>
-          </div>
-          <div className="text-xs text-[var(--muted-foreground)]">
-            <span className="tabular font-medium text-[var(--foreground)]">{items.length}</span> users ·{" "}
-            <span className="tabular">{activeCount}</span> active
-          </div>
-        </Toolbar>
+        <FilterBar
+          shown={loading ? null : filtered.length}
+          total={items.length}
+          noun={["user", "users"]}
+          activeCount={filterCount}
+          onClear={clear}
+        >
+          <SearchField
+            value={f.q}
+            onChange={(q) => set({ q })}
+            debounce={200}
+            placeholder="Search name, email or role"
+            className="sm:max-w-xs"
+          />
+          <Select value={f.status} onChange={(e) => set({ status: e.target.value })} aria-label="Filter by status" className="w-auto">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </Select>
+          <Select value={f.roleId} onChange={(e) => set({ roleId: e.target.value })} aria-label="Filter by role" className="w-auto">
+            <option value="">All roles</option>
+            {roleOptions.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </Select>
+          <Select value={f.campusId} onChange={(e) => set({ campusId: e.target.value })} aria-label="Filter by campus" className="w-auto">
+            <option value="">All campuses</option>
+            <option value="hq">Main Campus access</option>
+            {campuses.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+        </FilterBar>
 
         {loading ? (
           <TableSkeleton cols={5} />
+        ) : items.length > 0 && filtered.length === 0 ? (
+          <NoResults noun="users" icon={UsersIcon} onClear={clear} />
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={UsersIcon}
-            title={items.length === 0 ? "No users yet" : "No matching users"}
-            description={
-              items.length === 0 ? "Add a login and choose the campuses it can work in." : "Try a different search or filter."
-            }
+            title="No users yet"
+            description="Add a login and choose the campuses it can work in."
             action={
-              items.length === 0 && can("users", "Add") ? (
+              can("users", "Add") ? (
                 <Btn type="button" onClick={openCreate}>
                   <Plus />
                   Add user
@@ -242,19 +286,22 @@ export function UsersPage() {
             }
           />
         ) : (
+          <>
           <DataTable>
             <THead
+              sort={f.sort ? { key: f.sort, dir: f.dir as SortDir } : null}
+              onSort={(s) => set({ sort: s?.key ?? "", dir: s?.dir ?? "asc" })}
               columns={[
-                { label: "User" },
+                { label: "User", sortKey: "name" },
                 { label: "Roles" },
                 { label: "Campus access" },
-                { label: "Last sign-in" },
+                { label: "Last sign-in", sortKey: "lastLogin" },
                 { label: "Status" },
                 { label: "Actions", align: "right" },
               ]}
             />
             <tbody>
-              {filtered.map((user) => {
+              {visible.map((user) => {
                 const codes = campusCodes(user.campusIds);
                 return (
                   <Tr key={user.id}>
@@ -278,7 +325,7 @@ export function UsersPage() {
                     <Td>
                       {user.isHq ? (
                         <StatusPill tone="info" dot>
-                          All campuses (HQ)
+                          All campuses (Main Campus)
                         </StatusPill>
                       ) : codes.length ? (
                         <div className="flex flex-wrap gap-1">
@@ -323,6 +370,16 @@ export function UsersPage() {
               })}
             </tbody>
           </DataTable>
+          {filtered.length > 10 ? (
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={filtered.length}
+              onPage={(p) => set({ page: String(p) })}
+              onPageSize={(n) => set({ pageSize: String(n) })}
+            />
+          ) : null}
+          </>
         )}
       </Panel>
 
@@ -404,7 +461,7 @@ export function UsersPage() {
                   badge={
                     <>
                       <OwnerPill campusCode={role.campusCode} />
-                      {role.hqAssignOnly ? <StatusPill tone="warning">HQ only</StatusPill> : null}
+                      {role.hqAssignOnly ? <StatusPill tone="warning">Main Campus only</StatusPill> : null}
                     </>
                   }
                 />
@@ -420,7 +477,7 @@ export function UsersPage() {
               <Switch
                 checked={form.isHq}
                 onChange={(v) => setForm({ ...form, isHq: v })}
-                label="Head office (HQ) access"
+                label="Main Campus access"
                 description="Can work across every campus, including new ones."
                 disabled={lockAccess}
               />

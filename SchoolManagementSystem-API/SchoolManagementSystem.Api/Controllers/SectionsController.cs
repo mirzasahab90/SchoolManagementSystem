@@ -4,14 +4,30 @@ using SchoolManagementSystem.Api.Security;
 using SchoolManagementSystem.Application.Interfaces;
 using SchoolManagementSystem.Domain.Constants;
 using SchoolManagementSystem.Domain.DTOs;
+using SchoolManagementSystem.Domain.DTOs.Hiring;
 using SchoolManagementSystem.Domain.DTOs.Academics;
 
 namespace SchoolManagementSystem.Api.Controllers;
 
-public class SectionsController(ISectionService sectionService) : ApiControllerBase
+public class SectionsController(ISectionService sectionService, IStaffService staffService) : ApiControllerBase
 {
+    [HttpPut("{id:int}/class-teacher")]
+    [HasAnyPermission("sections:Edit", "staff:Edit")]
+    public async Task<ActionResult<ResponseDto<SectionDto>>> SetClassTeacher(int id, [FromBody] ClassTeacherRequest request, CancellationToken ct) =>
+        FromResult(await staffService.SetClassTeacherAsync(id, request, ct));
+
+    [HttpGet("{id:int}/class-teacher/options")]
+    [HasAnyPermission("sections:Edit", "staff:Edit")]
+    public async Task<ActionResult<ResponseDto<IReadOnlyList<ClassTeacherOptionDto>>>> ClassTeacherOptions(int id, CancellationToken ct) =>
+        FromResult(await staffService.GetClassTeacherOptionsAsync(id, ct));
+
+    [HttpGet("{id:int}/teachers")]
+    [HasAnyPermission("sections:View", "students:View", "staff:View")]
+    public async Task<ActionResult<ResponseDto<IReadOnlyList<OptionSubjectDto>>>> Teachers(int id, CancellationToken ct) =>
+        FromResult(await staffService.GetSectionTeachersAsync(id, ct));
+
     [HttpGet]
-    [HasPermission(AppModules.Sections, AppActions.View)]
+    [HasAnyPermission("sections:View", "students:View")]
     public async Task<ActionResult<ResponseDto<IReadOnlyList<SectionDto>>>> List([FromQuery] int? sessionId, [FromQuery] int? classId, CancellationToken ct) =>
         FromResult(await sectionService.ListAsync(sessionId, classId, ct));
 

@@ -8,7 +8,9 @@ import {
   DataTable,
   EmptyState,
   Field,
+  FilterBar,
   IconButton,
+  NoResults,
   PageHeader,
   Panel,
   SearchField,
@@ -19,26 +21,23 @@ import {
   Td,
   TextInput,
   THead,
-  Toolbar,
   Tr,
   type StatusTone,
 } from "@/components/sms-ui";
 import { useAuth } from "@/lib/auth";
 import { api, unwrap } from "@/lib/api";
+import { matches, useUrlFilters } from "@/lib/filters";
 import type { SaveSubjectRequest, Subject, SubjectType } from "@/lib/types";
 
 export const subjectTone: Record<SubjectType, StatusTone> = { Theory: "info", Practical: "warning", Activity: "success" };
 
 const emptyForm: SaveSubjectRequest = { code: "", name: "", type: "Theory", isActive: true };
 
-type StatusFilter = "all" | "active" | "inactive";
-
 export function SubjectsPage() {
   const { can, user: me } = useAuth();
   const [items, setItems] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<StatusFilter>("all");
+  const { values: f, set, clear, activeCount: filterCount } = useUrlFilters({ q: "", status: "", type: "", owner: "" });
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Subject | null>(null);
   const [form, setForm] = useState<SaveSubjectRequest>(emptyForm);
@@ -66,14 +65,18 @@ export function SubjectsPage() {
     void load();
   }, []);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return items.filter((s) => {
-      if (status === "active" && !s.isActive) return false;
-      if (status === "inactive" && s.isActive) return false;
-      return !q || `${s.code} ${s.name}`.toLowerCase().includes(q);
-    });
-  }, [items, query, status]);
+  const filtered = useMemo(
+    () =>
+      items.filter((s) => {
+        if (f.status === "active" && !s.isActive) return false;
+        if (f.status === "inactive" && s.isActive) return false;
+        if (f.type && s.type !== f.type) return false;
+        if (f.owner === "main" && s.campusId != null) return false;
+        if (f.owner === "campus" && s.campusId == null) return false;
+        return matches(f.q, s.code, s.name);
+      }),
+    [items, f.status, f.type, f.owner, f.q],
+  );
 
   function openCreate() {
     setEditing(null);
@@ -128,7 +131,7 @@ export function SubjectsPage() {
     <div>
       <PageHeader
         title="Subjects"
-        description="Everything taught across your classes. Head-office subjects are shared; a campus can add its own."
+        description="Everything taught across your classes. Main Campus subjects are shared; a campus can add its own."
         actions={
           canAdd ? (
             <Btn type="button" onClick={openCreate}>
@@ -140,28 +143,50 @@ export function SubjectsPage() {
       />
 
       <Panel flush>
-        <Toolbar>
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-            <SearchField value={query} onChange={setQuery} placeholder="Search code or name" />
-            <Select value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)} aria-label="Filter by status" className="w-auto">
-              <option value="all">All statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </Select>
-          </div>
-          <div className="text-xs text-[var(--muted-foreground)]">
-            <span className="tabular font-medium text-[var(--foreground)]">{items.length}</span> subjects
-          </div>
-        </Toolbar>
+        <FilterBar
+          shown={loading ? null : filtered.length}
+          total={items.length}
+          noun={["subject", "subjects"]}
+          activeCount={filterCount}
+          onClear={clear}
+        >
+          <SearchField value={f.q} onChange={(q) => set({ q })} debounce={200} placeholder="Search code or name" className="sm:max-w-xs" />
+          <Select value={f.status} onChange={(e) => set({ status: e.target.value })} aria-label="Filter by status" className="w-auto">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </Select>
+          <Select value={f.type} onChange={(e) => set({ type: e.target.value })} aria-label="Filter by type" className="w-auto">
+            <option value="">All types</option>
+            <option value="Theory">Theory</option>
+            <option value="Practical">Practical</option>
+            <option value="Activity">Activity</option>
+          </Select>
+          <Select value={f.owner} onChange={(e) => set({ owner: e.target.value })} aria-label="Filter by owner" className="w-auto">
+            <option value="">All owners</option>
+            <option value="main">Main Campus</option>
+            <option value="campus">Campus subjects</option>
+          </Select>
+        </FilterBar>
 
         {loading ? (
           <TableSkeleton cols={5} />
-        ) : filtered.length === 0 ? (
+        ) : items.length === 0 ? (
           <EmptyState
             icon={BookOpen}
-            title={items.length === 0 ? "No subjects yet" : "No matching subjects"}
-            description={items.length === 0 ? "Add the subjects your classes teach." : "Try a different search or filter."}
+            title="No subjects yet"
+            description="Add the subjects your classes teach."
+            action={
+              canAdd ? (
+                <Btn type="button" onClick={openCreate}>
+                  <Plus />
+                  Add subject
+                </Btn>
+              ) : null
+            }
           />
+        ) : filtered.length === 0 ? (
+          <NoResults noun="subjects" icon={BookOpen} onClear={clear} />
         ) : (
           <DataTable>
             <THead
@@ -261,9 +286,9 @@ export function SubjectsPage() {
             </Select>
           </Field>
           {!editing && onAllCampuses ? (
-            <Field label="Owner" hint="Head-office subjects are available to every campus.">
+            <Field label="Owner" hint="Main Campus subjects are available to every campus.">
               <Select value={owner} onChange={(e) => setOwner(e.target.value)}>
-                <option value="hq">Head office (all campuses)</option>
+                <option value="hq">Main Campus (all campuses)</option>
                 {me?.campuses.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} only

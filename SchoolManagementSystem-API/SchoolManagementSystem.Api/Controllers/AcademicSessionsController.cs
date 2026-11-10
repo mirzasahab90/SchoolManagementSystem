@@ -11,7 +11,7 @@ namespace SchoolManagementSystem.Api.Controllers;
 public class AcademicSessionsController(IAcademicSessionService sessionService) : ApiControllerBase
 {
     [HttpGet]
-    [HasPermission(AppModules.AcademicSessions, AppActions.View)]
+    [HasAnyPermission("academic-sessions:View", "sections:View", "students:View", "classes:View")]
     public async Task<ActionResult<ResponseDto<AcademicSessionListDto>>> List(CancellationToken ct) =>
         FromResult(await sessionService.ListAsync(ct));
 

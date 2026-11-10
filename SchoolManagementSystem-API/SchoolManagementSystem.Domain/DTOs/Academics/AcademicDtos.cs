@@ -34,7 +34,7 @@ public record SaveClassSubjectItem(int SubjectId, bool IsOptional);
 public record SectionDto(
     int Id, int CampusId, string CampusCode, string CampusName, int AcademicSessionId, string SessionName,
     int ClassId, string ClassCode, string ClassName, int ClassOrder, string Name, SectionShift Shift,
-    int? Capacity, string? Room, bool IsActive);
+    int? Capacity, string? Room, bool IsActive, int ActiveStudents = 0, int? ClassTeacherStaffId = null, string? ClassTeacherName = null);
 
 public record SaveSectionRequest(
     int ClassId, int? AcademicSessionId, string Name, SectionShift Shift, int? Capacity, string? Room,

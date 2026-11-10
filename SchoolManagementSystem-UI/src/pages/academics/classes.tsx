@@ -9,10 +9,13 @@ import {
   DataTable,
   EmptyState,
   Field,
+  FilterBar,
   FormSection,
   IconButton,
+  NoResults,
   PageHeader,
   Panel,
+  SearchField,
   Select,
   StatusPill,
   Switch,
@@ -25,6 +28,7 @@ import {
 } from "@/components/sms-ui";
 import { useAuth } from "@/lib/auth";
 import { api, unwrap } from "@/lib/api";
+import { matches, useUrlFilters } from "@/lib/filters";
 import { stageLabel, type ClassDetail, type ClassStage, type SaveClassRequest, type SchoolClass, type Subject } from "@/lib/types";
 
 const stageTone: Record<ClassStage, StatusTone> = {
@@ -46,6 +50,7 @@ export function ClassesPage() {
   const [editing, setEditing] = useState<SchoolClass | null>(null);
   const [form, setForm] = useState<SaveClassRequest>({ code: "", name: "", stage: "Primary", displayOrder: 1, isActive: true });
   const [owner, setOwner] = useState("hq");
+  const { values: f, set, clear, activeCount: filterCount } = useUrlFilters({ q: "", stage: "", status: "", owner: "" });
   const [picked, setPicked] = useState<Picked>(new Map());
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<SchoolClass | null>(null);
@@ -76,7 +81,20 @@ export function ClassesPage() {
     void load();
   }, []);
 
-  // A class may use HQ subjects plus subjects of its own campus.
+  const filtered = useMemo(
+    () =>
+      items.filter((c) => {
+        if (f.stage && c.stage !== f.stage) return false;
+        if (f.status === "active" && !c.isActive) return false;
+        if (f.status === "inactive" && c.isActive) return false;
+        if (f.owner === "main" && c.campusId != null) return false;
+        if (f.owner === "campus" && c.campusId == null) return false;
+        return matches(f.q, c.code, c.name);
+      }),
+    [items, f.stage, f.status, f.owner, f.q],
+  );
+
+  // A class may use Main Campus subjects plus subjects of its own campus.
   const classCampusId = editing ? (editing.campusId ?? null) : onAllCampuses && owner !== "hq" ? Number(owner) : isHq ? null : (me?.activeCampusId ?? null);
   const usableSubjects = useMemo(
     () => subjects.filter((s) => (s.isActive || picked.has(s.id)) && (s.campusId == null || s.campusId === classCampusId)),
@@ -170,7 +188,7 @@ export function ClassesPage() {
     <div>
       <PageHeader
         title="Classes"
-        description="Grades in promotion order and the subjects each one studies. Head-office classes are shared; a campus can add its own."
+        description="Grades in promotion order and the subjects each one studies. Main Campus classes are shared; a campus can add its own."
         actions={
           canAdd ? (
             <Btn type="button" onClick={openCreate}>
@@ -182,10 +200,52 @@ export function ClassesPage() {
       />
 
       <Panel flush>
+        <FilterBar
+          shown={loading ? null : filtered.length}
+          total={items.length}
+          noun={["class", "classes"]}
+          activeCount={filterCount}
+          onClear={clear}
+        >
+          <SearchField value={f.q} onChange={(q) => set({ q })} debounce={200} placeholder="Search code or name" className="sm:max-w-xs" />
+          <Select value={f.stage} onChange={(e) => set({ stage: e.target.value })} aria-label="Filter by stage" className="w-auto">
+            <option value="">All stages</option>
+            {(Object.keys(stageLabel) as ClassStage[]).map((s) => (
+              <option key={s} value={s}>
+                {stageLabel[s]}
+              </option>
+            ))}
+          </Select>
+          <Select value={f.status} onChange={(e) => set({ status: e.target.value })} aria-label="Filter by status" className="w-auto">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </Select>
+          <Select value={f.owner} onChange={(e) => set({ owner: e.target.value })} aria-label="Filter by owner" className="w-auto">
+            <option value="">All owners</option>
+            <option value="main">Main Campus</option>
+            <option value="campus">Campus classes</option>
+          </Select>
+        </FilterBar>
+
         {loading ? (
           <TableSkeleton cols={6} />
         ) : items.length === 0 ? (
-          <EmptyState icon={Layers} title="No classes yet" description="Add the grades your school teaches." />
+          <EmptyState
+            icon={Layers}
+            title="No classes yet"
+            description="Add the grades your school teaches."
+            action={
+              canAdd ? (
+                <Btn type="button" onClick={openCreate}>
+                  <Plus />
+                  Add class
+                </Btn>
+              ) : null
+            }
+          />
+        ) : filtered.length === 0 ? (
+          <NoResults noun="classes" icon={Layers} onClear={clear} />
         ) : (
           <DataTable>
             <THead
@@ -201,7 +261,7 @@ export function ClassesPage() {
               ]}
             />
             <tbody>
-              {items.map((c) => (
+              {filtered.map((c) => (
                 <Tr key={c.id} onClick={() => openEdit(c)}>
                   <Td className="tabular text-[var(--muted-foreground)]">{c.displayOrder}</Td>
                   <Td>
@@ -264,7 +324,7 @@ export function ClassesPage() {
           {editing && !canWriteOwned(me, editing.campusId) ? (
             <div className="flex items-start gap-2.5 rounded-lg bg-[var(--info-soft)] px-3 py-2.5 text-sm text-[var(--info)]">
               <Lock className="mt-0.5 size-4 shrink-0" />
-              Head-office class. Create your own class to change its subjects.
+              Main Campus class. Create your own class to change its subjects.
             </div>
           ) : null}
 
@@ -304,9 +364,9 @@ export function ClassesPage() {
               </Field>
             </div>
             {!editing && onAllCampuses ? (
-              <Field label="Owner" hint="Head-office classes are available to every campus.">
+              <Field label="Owner" hint="Main Campus classes are available to every campus.">
                 <Select value={owner} onChange={(e) => setOwner(e.target.value)}>
-                  <option value="hq">Head office (all campuses)</option>
+                  <option value="hq">Main Campus (all campuses)</option>
                   {me?.campuses.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name} only

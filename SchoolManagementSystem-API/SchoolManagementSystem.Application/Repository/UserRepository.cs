@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SchoolManagementSystem.Domain.DTOs.Hiring;
 using SchoolManagementSystem.Domain.DTOs.Users;
 using SchoolManagementSystem.Domain.Entities.Identity;
 using SchoolManagementSystem.Domain.Entities.Org;
@@ -19,6 +20,17 @@ public class UserRepository(SchoolManagementSystemDbContext dbContext) : BaseRep
             .Include(u => u.UserRoles)
             .Include(u => u.UserCampuses)
             .FirstOrDefaultAsync(u => u.Id == id, ct);
+
+    /// <summary>Active users who are Main Campus users or assigned to the campus, for interviewer pickers.</summary>
+    public Task<List<UserPickDto>> PickAsync(int campusId, CancellationToken ct = default) =>
+        Db.Users.AsNoTracking()
+            .Where(u => u.IsActive && (u.IsHq || u.UserCampuses.Any(uc => uc.CampusId == campusId)))
+            .OrderBy(u => u.FirstName).ThenBy(u => u.LastName)
+            .Select(u => new UserPickDto(u.Id, (u.FirstName + " " + u.LastName).Trim()))
+            .ToListAsync(ct);
+
+    public Task<bool> CanInterviewAsync(int userId, int campusId, CancellationToken ct = default) =>
+        Db.Users.AnyAsync(u => u.Id == userId && u.IsActive && (u.IsHq || u.UserCampuses.Any(uc => uc.CampusId == campusId)), ct);
 
     public Task<User?> GetActiveReadOnlyAsync(int id, CancellationToken ct = default) =>
         Db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id && u.IsActive, ct);

@@ -11,7 +11,7 @@ namespace SchoolManagementSystem.Api.Controllers;
 public class CampusesController(ICampusService campusService) : ApiControllerBase
 {
     [HttpGet]
-    [HasPermission(AppModules.Campuses, AppActions.View)]
+    [HasAnyPermission("campuses:View", "users:Add", "users:Edit", "my-campus:View")]
     public async Task<ActionResult<ResponseDto<IReadOnlyList<CampusDto>>>> List(CancellationToken ct) =>
         FromResult(await campusService.ListAsync(ct));
 

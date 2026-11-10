@@ -7,11 +7,14 @@ import {
   Btn,
   EmptyState,
   Field,
+  FilterBar,
   FormSection,
   IconButton,
+  NoResults,
   PageHeader,
   SearchField,
   SectionLabel,
+  Select,
   Skeleton,
   StatusPill,
   Switch,
@@ -20,6 +23,7 @@ import {
 } from "@/components/sms-ui";
 import { useAuth } from "@/lib/auth";
 import { api, unwrap } from "@/lib/api";
+import { matches, useUrlFilters } from "@/lib/filters";
 import type { Campus, SaveCampusRequest } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -52,7 +56,7 @@ export function CampusesPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<Campus | null>(null);
-  const [query, setQuery] = useState("");
+  const { values: f, set, clear, activeCount: filterCount } = useUrlFilters({ q: "", status: "" });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Campus | null>(null);
@@ -75,13 +79,15 @@ export function CampusesPage() {
     void load();
   }, []);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((c) =>
-      [c.code, c.name, c.city, c.state, c.country, c.inChargeName].filter(Boolean).join(" ").toLowerCase().includes(q),
-    );
-  }, [items, query]);
+  const filtered = useMemo(
+    () =>
+      items.filter((c) => {
+        if (f.status === "active" && !c.isActive) return false;
+        if (f.status === "inactive" && c.isActive) return false;
+        return matches(f.q, c.code, c.name, c.city, c.state, c.country, c.inChargeName);
+      }),
+    [items, f.status, f.q],
+  );
 
   const canAdd = isHq && can("campuses", "Add");
   const canDelete = isHq && can("campuses", "Delete");
@@ -185,21 +191,39 @@ export function CampusesPage() {
         }
       />
 
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <SearchField value={query} onChange={setQuery} placeholder="Search name, code, city or in-charge" />
-        <div className="flex items-center gap-4 text-xs text-[var(--muted-foreground)]">
-          <span>
-            <span className="tabular font-medium text-[var(--foreground)]">{items.length}</span> campuses
-          </span>
-          <span>
-            <span className="tabular font-medium text-[var(--foreground)]">{activeCount}</span> active
-          </span>
-          {totalCapacity ? (
+      <div className="panel mb-5">
+        <FilterBar
+          shown={loading ? null : filtered.length}
+          total={items.length}
+          noun={["campus", "campuses"]}
+          activeCount={filterCount}
+          onClear={clear}
+          className="border-b-0"
+        >
+          <SearchField
+            value={f.q}
+            onChange={(q) => set({ q })}
+            debounce={200}
+            placeholder="Search name, code, city or in-charge"
+            className="sm:max-w-xs"
+          />
+          <Select value={f.status} onChange={(e) => set({ status: e.target.value })} aria-label="Filter by status" className="w-auto">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </Select>
+          <div className="flex items-center gap-4 text-xs text-[var(--muted-foreground)]">
+            {/* Totals across every campus, whatever the filters. */}
             <span>
-              <span className="tabular font-medium text-[var(--foreground)]">{totalCapacity.toLocaleString()}</span> seats
+              <span className="tabular font-medium text-[var(--foreground)]">{activeCount}</span> active
             </span>
-          ) : null}
-        </div>
+            {totalCapacity ? (
+              <span>
+                <span className="tabular font-medium text-[var(--foreground)]">{totalCapacity.toLocaleString()}</span> seats
+              </span>
+            ) : null}
+          </div>
+        </FilterBar>
       </div>
 
       {loading ? (
@@ -218,14 +242,18 @@ export function CampusesPage() {
             </div>
           ))}
         </div>
+      ) : items.length > 0 && filtered.length === 0 ? (
+        <div className="panel">
+          <NoResults noun="campuses" icon={Building2} onClear={clear} />
+        </div>
       ) : filtered.length === 0 ? (
         <div className="panel">
           <EmptyState
             icon={Building2}
-            title={items.length === 0 ? "No campuses yet" : "No matching campuses"}
-            description={items.length === 0 ? "Add your first campus to start running multiple branches." : "Try a different search."}
+            title="No campuses yet"
+            description="Add your first campus to start running multiple branches."
             action={
-              items.length === 0 && canAdd ? (
+              canAdd ? (
                 <Btn type="button" onClick={openCreate}>
                   <Plus />
                   Add campus
@@ -324,7 +352,7 @@ export function CampusesPage() {
         <form id="campus-form" className="space-y-6" onSubmit={onSubmit}>
           <FormSection title="Identity">
             <div className="grid gap-4 sm:grid-cols-[160px_1fr]">
-              <Field label="Code" required hint={!isHq ? "Only HQ can change the code." : "Short, unique, e.g. MAIN"}>
+              <Field label="Code" required hint={!isHq ? "Only Main Campus can change the code." : "Short, unique, e.g. CITY"}>
                 <TextInput
                   value={form.code}
                   onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
@@ -341,7 +369,7 @@ export function CampusesPage() {
               checked={form.isActive}
               onChange={(v) => setForm({ ...form, isActive: v })}
               label="Campus active"
-              description={isHq ? "Inactive campuses are hidden from campus pickers." : "Only HQ can change this."}
+              description={isHq ? "Inactive campuses are hidden from campus pickers." : "Only Main Campus can change this."}
               disabled={!isHq}
             />
           </FormSection>

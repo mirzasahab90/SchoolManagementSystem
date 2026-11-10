@@ -6,8 +6,12 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using SchoolManagementSystem.Domain.Abstractions;
 using SchoolManagementSystem.Domain.Common;
 using SchoolManagementSystem.Domain.Entities.Academics;
+using SchoolManagementSystem.Domain.Entities.Attendance;
+using SchoolManagementSystem.Domain.Entities.Exams;
+using SchoolManagementSystem.Domain.Entities.Hiring;
 using SchoolManagementSystem.Domain.Entities.Identity;
 using SchoolManagementSystem.Domain.Entities.Org;
+using SchoolManagementSystem.Domain.Entities.Students;
 
 namespace SchoolManagementSystem.Infrastructure;
 
@@ -32,6 +36,36 @@ public class SchoolManagementSystemDbContext(DbContextOptions<SchoolManagementSy
     public DbSet<Subject> Subjects => Set<Subject>();
     public DbSet<ClassSubject> ClassSubjects => Set<ClassSubject>();
     public DbSet<Section> Sections => Set<Section>();
+    public DbSet<Student> Students => Set<Student>();
+    public DbSet<Guardian> Guardians => Set<Guardian>();
+    public DbSet<StudentGuardian> StudentGuardians => Set<StudentGuardian>();
+    public DbSet<Enrollment> Enrollments => Set<Enrollment>();
+    public DbSet<EnrollmentHistory> EnrollmentHistory => Set<EnrollmentHistory>();
+    public DbSet<StudentDocument> StudentDocuments => Set<StudentDocument>();
+    public DbSet<CampusSequence> CampusSequences => Set<CampusSequence>();
+    public DbSet<Vacancy> Vacancies => Set<Vacancy>();
+    public DbSet<Candidate> Candidates => Set<Candidate>();
+    public DbSet<CandidateStageHistory> CandidateStageHistory => Set<CandidateStageHistory>();
+    public DbSet<InterviewRound> InterviewRounds => Set<InterviewRound>();
+    public DbSet<Offer> Offers => Set<Offer>();
+    public DbSet<Staff> Staff => Set<Staff>();
+    public DbSet<StaffDocument> StaffDocuments => Set<StaffDocument>();
+    public DbSet<TeachingAssignment> TeachingAssignments => Set<TeachingAssignment>();
+    public DbSet<CampusCalendar> CampusCalendars => Set<CampusCalendar>();
+    public DbSet<Holiday> Holidays => Set<Holiday>();
+    public DbSet<AttendanceDay> AttendanceDays => Set<AttendanceDay>();
+    public DbSet<AttendanceEntry> AttendanceEntries => Set<AttendanceEntry>();
+    public DbSet<StaffAttendance> StaffAttendance => Set<StaffAttendance>();
+    public DbSet<GradeScale> GradeScales => Set<GradeScale>();
+    public DbSet<GradeBand> GradeBands => Set<GradeBand>();
+    public DbSet<ResultScheme> ResultSchemes => Set<ResultScheme>();
+    public DbSet<Exam> Exams => Set<Exam>();
+    public DbSet<ExamPaper> ExamPapers => Set<ExamPaper>();
+    public DbSet<PaperSection> PaperSections => Set<PaperSection>();
+    public DbSet<Mark> Marks => Set<Mark>();
+    public DbSet<SectionResult> SectionResults => Set<SectionResult>();
+    public DbSet<StudentResult> StudentResults => Set<StudentResult>();
+    public DbSet<ResultRemark> ResultRemarks => Set<ResultRemark>();
 
     /// <summary>Campuses the current request may read; evaluated per query by the EF filters below.</summary>
     private IReadOnlyCollection<int> CampusFilterIds => currentUser.DataCampusIds ?? [];
@@ -147,7 +181,7 @@ public class SchoolManagementSystemDbContext(DbContextOptions<SchoolManagementSy
             {
                 if (owner == null && !currentUser.IsHq)
                 {
-                    throw new CampusAccessException("Only HQ can change head-office items.");
+                    throw new CampusAccessException("Only Main Campus can change Main Campus items.");
                 }
 
                 if (owner is int campusId && !currentUser.CanAccessCampus(campusId))

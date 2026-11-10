@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode, type RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import {
+  FilePen,
+  FileText,
+  PencilLine,
+  SlidersHorizontal,
+  Trophy,
   BookOpen,
   Building2,
   CalendarRange,
+  HeartHandshake,
   KeyRound,
+  UsersRound,
   LayoutGrid,
   Layers,
   School,
@@ -25,6 +32,15 @@ import {
   Sun,
   Users,
   X,
+  BarChart3,
+  Briefcase,
+  CalendarCheck,
+  CalendarDays,
+  ClipboardCheck,
+  UserCheck,
+  IdCard,
+  Megaphone,
+  UserSearch,
 } from "lucide-react";
 import { Avatar, StatusPill } from "@/components/sms-ui";
 import { useAuth } from "@/lib/auth";
@@ -46,6 +62,22 @@ const iconMap: Record<string, ComponentType<{ className?: string }>> = {
   layers: Layers,
   "book-open": BookOpen,
   "layout-grid": LayoutGrid,
+  "users-round": UsersRound,
+  "heart-handshake": HeartHandshake,
+  briefcase: Briefcase,
+  megaphone: Megaphone,
+  "user-search": UserSearch,
+  "id-card": IdCard,
+  "calendar-check": CalendarCheck,
+  "clipboard-check": ClipboardCheck,
+  "bar-chart-3": BarChart3,
+  "user-check": UserCheck,
+  "calendar-days": CalendarDays,
+  "file-pen": FilePen,
+  "file-text": FileText,
+  "pencil-line": PencilLine,
+  trophy: Trophy,
+  "sliders-horizontal": SlidersHorizontal,
 };
 
 const COLLAPSE_KEY = "schoolms.sidebarCollapsed";
@@ -80,9 +112,27 @@ function useClickOutside(ref: RefObject<HTMLElement | null>, onOutside: () => vo
 /* Sidebar                                                             */
 /* ------------------------------------------------------------------ */
 
+/** The menu route the page belongs to: the longest route that is the path or a prefix of it (/admin only exactly). */
+function activeRoute(menu: MenuItem[], pathname: string): { route: string; trail: string[] } | null {
+  let best: { route: string; trail: string[] } | null = null;
+  const consider = (route: string | null | undefined, trail: string[]) => {
+    if (!route || (route === "/admin" && pathname !== "/admin")) return;
+    const hit = pathname === route || pathname.startsWith(`${route}/`);
+    if (hit && (!best || route.length > best.route.length)) best = { route, trail };
+  };
+  for (const item of menu) {
+    consider(item.route, [item.name]);
+    for (const child of item.children ?? []) consider(child.route, [item.name, child.name]);
+  }
+  return best;
+}
+
 function NavItem({ item, collapsed, onNavigate }: { item: MenuItem; collapsed: boolean; onNavigate?: () => void }) {
   const Icon = iconMap[item.icon ?? ""] ?? LayoutDashboard;
+  const { user } = useAuth();
+  const { pathname } = useLocation();
   if (!item.route) return null;
+  const isActive = activeRoute(user?.menu ?? [], pathname)?.route === item.route;
 
   return (
     <NavLink
@@ -90,7 +140,7 @@ function NavItem({ item, collapsed, onNavigate }: { item: MenuItem; collapsed: b
       end={item.route === "/admin"}
       title={collapsed ? item.name : undefined}
       onClick={onNavigate}
-      className={({ isActive }) =>
+      className={() =>
         cn(
           "group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-sm font-medium transition-colors",
           collapsed && "justify-center px-0",
@@ -147,7 +197,7 @@ function Brand({ collapsed }: { collapsed: boolean }) {
         <span className="min-w-0 leading-tight">
           <span className="block truncate text-sm font-semibold">{name}</span>
           <span className="block truncate text-xs text-[var(--muted-foreground)]">
-            {user?.isHq ? "Head office" : "Campus workspace"}
+            {user?.isHq ? "Main Campus" : "Campus workspace"}
           </span>
         </span>
       ) : null}
@@ -262,7 +312,7 @@ function CampusSwitcher() {
                   onClick={() => choose(null)}
                   icon={<Globe2 className="size-4" />}
                   title="All campuses"
-                  subtitle="Consolidated HQ view"
+                  subtitle="Consolidated Main Campus view"
                 />
                 <div className="my-1.5 h-px bg-[var(--border)]" />
               </>
@@ -374,7 +424,7 @@ function UserMenu() {
           </div>
           <div className="flex flex-wrap gap-1.5 border-b border-[var(--border)] px-4 py-3">
             {user.isSuperAdmin ? <StatusPill tone="primary">Super admin</StatusPill> : null}
-            {user.isHq && !user.isSuperAdmin ? <StatusPill tone="info">HQ access</StatusPill> : null}
+            {user.isHq && !user.isSuperAdmin ? <StatusPill tone="info">Main Campus access</StatusPill> : null}
             {user.roles
               .filter((r) => r !== "SuperAdmin")
               .map((r) => (
@@ -441,21 +491,13 @@ function MenuRow({
 function Breadcrumbs({ menu }: { menu: MenuItem[] }) {
   const { pathname } = useLocation();
   const trail = useMemo(() => {
-    for (const item of menu) {
-      if (item.route && (pathname === item.route || (item.route !== "/admin" && pathname.startsWith(item.route)))) {
-        return [item.name];
-      }
-      for (const child of item.children ?? []) {
-        if (child.route && pathname.startsWith(child.route)) return [item.name, child.name];
-      }
-    }
-    return ["Dashboard"];
+    return activeRoute(menu, pathname)?.trail ?? ["Dashboard"];
   }, [menu, pathname]);
 
   return (
     <div className="hidden min-w-0 items-center gap-1.5 text-sm md:flex">
       {trail.map((part, i) => (
-        <span key={part} className="flex items-center gap-1.5">
+        <span key={`${i}-${part}`} className="flex items-center gap-1.5">
           {i > 0 ? <ChevronRight className="size-3.5 text-[var(--muted-foreground)]" /> : null}
           <span className={cn(i === trail.length - 1 ? "font-medium" : "text-[var(--muted-foreground)]")}>{part}</span>
         </span>

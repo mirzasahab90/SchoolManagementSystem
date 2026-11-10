@@ -16,5 +16,6 @@ public class SectionConfiguration : IEntityTypeConfiguration<Section>
         builder.HasOne(x => x.Campus).WithMany().HasForeignKey(x => x.CampusId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.AcademicSession).WithMany().HasForeignKey(x => x.AcademicSessionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.Class).WithMany().HasForeignKey(x => x.ClassId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.ClassTeacher).WithMany().HasForeignKey(x => x.ClassTeacherStaffId).OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -11,12 +11,12 @@ namespace SchoolManagementSystem.Api.Controllers;
 public class ClassesController(IClassService classService) : ApiControllerBase
 {
     [HttpGet]
-    [HasPermission(AppModules.Classes, AppActions.View)]
+    [HasAnyPermission("classes:View", "sections:View", "students:View", "vacancies:View")]
     public async Task<ActionResult<ResponseDto<IReadOnlyList<ClassDto>>>> List(CancellationToken ct) =>
         FromResult(await classService.ListAsync(ct));
 
     [HttpGet("{id:int}")]
-    [HasPermission(AppModules.Classes, AppActions.View)]
+    [HasAnyPermission("classes:View", "sections:View", "students:View", "vacancies:View")]
     public async Task<ActionResult<ResponseDto<ClassDetailDto>>> Get(int id, CancellationToken ct) =>
         FromResult(await classService.GetAsync(id, ct));
 

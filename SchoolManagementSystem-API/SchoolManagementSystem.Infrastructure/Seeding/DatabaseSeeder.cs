@@ -16,6 +16,9 @@ public class DatabaseSeeder(
     public const string AdminEmail = "admin@sms.com";
     public const string AdminPassword = "@123@123";
 
+    /// <summary>Module keys created (not just updated) during this seed run.</summary>
+    private readonly HashSet<string> _createdModules = new(StringComparer.OrdinalIgnoreCase);
+
     public async Task SeedAsync(CancellationToken ct = default)
     {
         await SeedPermissionsAsync(ct);
@@ -25,7 +28,9 @@ public class DatabaseSeeder(
         await SeedSuperAdminAsync(ct);
         await db.SaveChangesAsync(ct);
         await RoleDefaultsSeeder.SeedAsync(db, ct);
+        await RoleDefaultsSeeder.GrantNewModulesAsync(db, _createdModules, ct);
         await AcademicSeeder.SeedAsync(db, ct);
+        await ExamSeeder.SeedAsync(db, ct);
         logger.LogInformation("Database seed completed.");
     }
 
@@ -52,6 +57,7 @@ public class DatabaseSeeder(
             {
                 module = new Module { Key = key };
                 db.Modules.Add(module);
+                _createdModules.Add(key);
             }
 
             module.Name = name;
@@ -68,13 +74,30 @@ public class DatabaseSeeder(
         await Upsert(AppModules.MyCampus, "My campus", "/admin/my-campus", "school", 2, null, campusLevel: true);
         await Upsert(AppModules.Campuses, "Campuses", "/admin/campuses", "building-2", 3, null);
         var academics = await Upsert(AppModules.Academics, "Academics", null, "graduation-cap", 4, null);
-        var settings = await Upsert(AppModules.Settings, "Settings", null, "settings", 5, null);
+        var studentsMenu = await Upsert(AppModules.StudentsMenu, "Students", null, "users-round", 5, null);
+        var staffMenu = await Upsert(AppModules.StaffMenu, "Staff", null, "briefcase", 6, null);
+        var attendanceMenu = await Upsert(AppModules.AttendanceMenu, "Attendance", null, "calendar-check", 7, null);
+        var examsMenu = await Upsert(AppModules.ExamsMenu, "Exams", null, "file-pen", 8, null);
+        var settings = await Upsert(AppModules.Settings, "Settings", null, "settings", 9, null);
         await db.SaveChangesAsync(ct);
 
         await Upsert(AppModules.AcademicSessions, "Sessions", "/admin/academics/sessions", "calendar-range", 1, academics.Id, campusLevel: true);
         await Upsert(AppModules.Classes, "Classes", "/admin/academics/classes", "layers", 2, academics.Id, campusLevel: true);
         await Upsert(AppModules.Subjects, "Subjects", "/admin/academics/subjects", "book-open", 3, academics.Id, campusLevel: true);
         await Upsert(AppModules.Sections, "Sections", "/admin/academics/sections", "layout-grid", 4, academics.Id, campusLevel: true);
+        await Upsert(AppModules.Students, "Students", "/admin/students", "graduation-cap", 1, studentsMenu.Id, campusLevel: true);
+        await Upsert(AppModules.Guardians, "Guardians", "/admin/guardians", "heart-handshake", 2, studentsMenu.Id, campusLevel: true);
+        await Upsert(AppModules.Vacancies, "Vacancies", "/admin/hiring/vacancies", "megaphone", 1, staffMenu.Id, campusLevel: true);
+        await Upsert(AppModules.Candidates, "Candidates", "/admin/hiring/candidates", "user-search", 2, staffMenu.Id, campusLevel: true);
+        await Upsert(AppModules.Staff, "Staff", "/admin/staff", "id-card", 3, staffMenu.Id, campusLevel: true);
+        await Upsert(AppModules.Attendance, "Mark attendance", "/admin/attendance", "clipboard-check", 1, attendanceMenu.Id, campusLevel: true);
+        await Upsert(AppModules.AttendanceReports, "Reports", "/admin/attendance/reports", "bar-chart-3", 2, attendanceMenu.Id, campusLevel: true);
+        await Upsert(AppModules.StaffAttendance, "Staff attendance", "/admin/attendance/staff", "user-check", 3, attendanceMenu.Id, campusLevel: true);
+        await Upsert(AppModules.Calendar, "Calendar", "/admin/attendance/calendar", "calendar-days", 4, attendanceMenu.Id, campusLevel: true);
+        await Upsert(AppModules.Exams, "Exams", "/admin/exams", "file-text", 1, examsMenu.Id, campusLevel: true);
+        await Upsert(AppModules.Marks, "Marks entry", "/admin/exams/marks", "pencil-line", 2, examsMenu.Id, campusLevel: true);
+        await Upsert(AppModules.Results, "Results", "/admin/exams/results", "trophy", 3, examsMenu.Id, campusLevel: true);
+        await Upsert(AppModules.Grading, "Grading", "/admin/exams/grading", "sliders-horizontal", 4, examsMenu.Id, campusLevel: true);
         await Upsert(AppModules.Users, "Users", "/admin/users", "users", 1, settings.Id, campusLevel: true);
         await Upsert(AppModules.Roles, "Roles", "/admin/roles", "shield", 2, settings.Id, campusLevel: true);
         await db.SaveChangesAsync(ct);
@@ -88,7 +111,7 @@ public class DatabaseSeeder(
         }
 
         db.Roles.AddRange(
-            new Role { Name = SystemRoles.SuperAdmin, Description = "Full HQ access", IsSystem = true, IsActive = true },
+            new Role { Name = SystemRoles.SuperAdmin, Description = "Full Main Campus access", IsSystem = true, IsActive = true },
             new Role { Name = SystemRoles.Principal, Description = "Campus principal / admin", IsSystem = true, IsActive = true },
             new Role { Name = SystemRoles.Accountant, Description = "Fees and accounts", IsSystem = true, IsActive = true },
             new Role { Name = SystemRoles.Teacher, Description = "Teaching staff", IsSystem = true, IsActive = true },
@@ -117,9 +140,9 @@ public class DatabaseSeeder(
             new Campus
             {
                 School = school,
-                Code = "MAIN",
-                Name = "Main Campus",
-                Address = "Main Campus Road",
+                Code = "CITY",
+                Name = "City Campus",
+                Address = "City Campus Road",
                 City = "Karachi",
                 Country = "Pakistan",
                 InChargeName = "Campus Head",

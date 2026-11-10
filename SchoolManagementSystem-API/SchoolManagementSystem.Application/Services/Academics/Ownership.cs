@@ -9,7 +9,7 @@ namespace SchoolManagementSystem.Application.Services.Academics;
 /// </summary>
 public static class Ownership
 {
-    public static readonly Error HqItem = Error.Forbidden("Only HQ can change head-office items.");
+    public static readonly Error HqItem = Error.Forbidden("Only Main Campus can change Main Campus items.");
 
     /// <summary>
     /// Owner for a new row. HQ may pass a campus (or none for an HQ row); campus users always create

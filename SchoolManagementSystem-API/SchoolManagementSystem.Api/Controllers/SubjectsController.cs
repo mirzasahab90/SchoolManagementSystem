@@ -11,7 +11,7 @@ namespace SchoolManagementSystem.Api.Controllers;
 public class SubjectsController(ISubjectService subjectService) : ApiControllerBase
 {
     [HttpGet]
-    [HasPermission(AppModules.Subjects, AppActions.View)]
+    [HasAnyPermission("subjects:View", "classes:View", "students:View", "vacancies:View")]
     public async Task<ActionResult<ResponseDto<IReadOnlyList<SubjectDto>>>> List(CancellationToken ct) =>
         FromResult(await subjectService.ListAsync(ct));
 

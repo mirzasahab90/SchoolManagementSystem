@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { CalendarRange, CheckCircle2, Info, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmDialog, Modal } from "@/components/modal";
@@ -8,9 +8,12 @@ import {
   DataTable,
   EmptyState,
   Field,
+  FilterBar,
   IconButton,
+  NoResults,
   PageHeader,
   Panel,
+  SearchField,
   Select,
   StatusPill,
   TableSkeleton,
@@ -22,6 +25,7 @@ import {
 } from "@/components/sms-ui";
 import { useAuth } from "@/lib/auth";
 import { api, unwrap } from "@/lib/api";
+import { matches, useUrlFilters } from "@/lib/filters";
 import type { AcademicSession, AcademicSessionList, SaveAcademicSessionRequest, SessionStatus } from "@/lib/types";
 
 const statusTone: Record<SessionStatus, StatusTone> = { Planned: "neutral", Active: "success", Closed: "warning" };
@@ -40,6 +44,7 @@ export function AcademicSessionsPage() {
   const [editing, setEditing] = useState<AcademicSession | null>(null);
   const [form, setForm] = useState<SaveAcademicSessionRequest>(emptyForm);
   const [owner, setOwner] = useState("hq");
+  const { values: f, set, clear, activeCount: filterCount } = useUrlFilters({ q: "", status: "" });
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<AcademicSession | null>(null);
   const [busy, setBusy] = useState(false);
@@ -68,6 +73,10 @@ export function AcademicSessionsPage() {
   const hqCurrent = items.find((s) => s.campusId == null && s.isCurrent);
   const overridden = effectiveId != null && hqCurrent != null && effectiveId !== hqCurrent.id;
   const writable = (s: AcademicSession) => canWriteOwned(me, s.campusId);
+  const filtered = useMemo(
+    () => (list?.items ?? []).filter((s) => (!f.status || s.status === f.status) && matches(f.q, s.name, s.campusCode)),
+    [list, f.status, f.q],
+  );
 
   function openCreate() {
     setEditing(null);
@@ -107,7 +116,7 @@ export function AcademicSessionsPage() {
     setBusy(true);
     try {
       await unwrap(api.post(`/academic-sessions/${s.id}/set-current`));
-      toast.success(s.campusId == null && !isHq ? "Your campus now follows the head-office session" : `${s.name} is now current`);
+      toast.success(s.campusId == null && !isHq ? "Your campus now follows the Main Campus session" : `${s.name} is now current`);
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not change the current session");
@@ -135,7 +144,7 @@ export function AcademicSessionsPage() {
     <div>
       <PageHeader
         title="Academic sessions"
-        description="School years such as 2026-27. Head-office sessions apply to every campus; a campus can run its own calendar if it needs to."
+        description="School years such as 2026-27. Main Campus sessions apply to every campus; a campus can run its own calendar if it needs to."
         actions={
           canAdd ? (
             <Btn type="button" onClick={openCreate}>
@@ -149,15 +158,45 @@ export function AcademicSessionsPage() {
       {!isHq && overridden ? (
         <div className="mb-5 flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--info-soft)] px-4 py-3 text-sm text-[var(--info)]">
           <Info className="mt-0.5 size-4 shrink-0" />
-          Your campus uses its own current session instead of head office's {hqCurrent?.name}.
+          Your campus uses its own current session instead of Main Campus's {hqCurrent?.name}.
         </div>
       ) : null}
 
       <Panel flush>
+        <FilterBar
+          shown={loading ? null : filtered.length}
+          total={items.length}
+          noun={["session", "sessions"]}
+          activeCount={filterCount}
+          onClear={clear}
+        >
+          <SearchField value={f.q} onChange={(q) => set({ q })} debounce={200} placeholder="Search sessions" className="sm:max-w-xs" />
+          <Select value={f.status} onChange={(e) => set({ status: e.target.value })} aria-label="Filter by status" className="w-auto">
+            <option value="">All statuses</option>
+            <option value="Planned">Planned</option>
+            <option value="Active">Active</option>
+            <option value="Closed">Closed</option>
+          </Select>
+        </FilterBar>
+
         {loading ? (
           <TableSkeleton cols={5} />
         ) : items.length === 0 ? (
-          <EmptyState icon={CalendarRange} title="No sessions yet" description="Add the school year your campuses are running." />
+          <EmptyState
+            icon={CalendarRange}
+            title="No sessions yet"
+            description="Add the school year your campuses are running."
+            action={
+              canAdd ? (
+                <Btn type="button" onClick={openCreate}>
+                  <Plus />
+                  Add session
+                </Btn>
+              ) : null
+            }
+          />
+        ) : filtered.length === 0 ? (
+          <NoResults noun="sessions" icon={CalendarRange} onClear={clear} />
         ) : (
           <DataTable>
             <THead
@@ -171,13 +210,13 @@ export function AcademicSessionsPage() {
               ]}
             />
             <tbody>
-              {items.map((s) => {
+              {filtered.map((s) => {
                 const isEffective = s.id === effectiveId;
                 const canSetCurrent =
                   can("academic-sessions", "Edit") &&
                   s.status !== "Closed" &&
                   !isEffective &&
-                  // Campus users may "follow HQ" again, but only by picking HQ's current session.
+                  // Campus users may "follow Main Campus" again, but only by picking Main Campus's current session.
                   (writable(s) || (s.campusId == null && !isHq && s.isCurrent));
                 return (
                   <Tr key={s.id}>
@@ -186,7 +225,7 @@ export function AcademicSessionsPage() {
                         {s.name}
                         {isEffective ? <StatusPill tone="primary">Current</StatusPill> : null}
                         {!isEffective && s.isCurrent && s.campusId == null ? (
-                          <span className="text-xs font-normal text-[var(--muted-foreground)]">HQ current</span>
+                          <span className="text-xs font-normal text-[var(--muted-foreground)]">Main Campus current</span>
                         ) : null}
                       </div>
                     </Td>
@@ -207,7 +246,7 @@ export function AcademicSessionsPage() {
                         {canSetCurrent ? (
                           <Btn type="button" size="sm" variant="outline" disabled={busy} onClick={() => makeCurrent(s)}>
                             <CheckCircle2 />
-                            {s.campusId == null && !isHq ? "Follow HQ" : "Set as current"}
+                            {s.campusId == null && !isHq ? "Follow Main Campus" : "Set as current"}
                           </Btn>
                         ) : null}
                         {writable(s) && can("academic-sessions", "Edit") ? (
@@ -266,9 +305,9 @@ export function AcademicSessionsPage() {
             </Select>
           </Field>
           {!editing && onAllCampuses ? (
-            <Field label="Owner" hint="Head-office sessions apply to every campus.">
+            <Field label="Owner" hint="Main Campus sessions apply to every campus.">
               <Select value={owner} onChange={(e) => setOwner(e.target.value)}>
-                <option value="hq">Head office (all campuses)</option>
+                <option value="hq">Main Campus (all campuses)</option>
                 {me?.campuses.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} only

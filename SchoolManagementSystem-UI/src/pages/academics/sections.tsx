@@ -6,8 +6,11 @@ import {
   Btn,
   EmptyState,
   Field,
+  FilterBar,
   IconButton,
+  NoResults,
   PageHeader,
+  SearchField,
   Select,
   Skeleton,
   StatusPill,
@@ -16,7 +19,9 @@ import {
 } from "@/components/sms-ui";
 import { useAuth } from "@/lib/auth";
 import { api, unwrap } from "@/lib/api";
+import { matches, useUrlFilters } from "@/lib/filters";
 import { cn } from "@/lib/utils";
+import { SectionTeachersDialog } from "./section-teachers";
 import {
   shiftLabel,
   stageLabel,
@@ -36,10 +41,9 @@ export function SectionsPage() {
   const activeCampusId = me?.activeCampusId ?? null;
   const onAllCampuses = activeCampusId == null;
 
+  const { values: f, set, activeCount } = useUrlFilters({ sessionId: "", classId: "", q: "", shift: "" });
   const [sessions, setSessions] = useState<AcademicSessionList | null>(null);
-  const [sessionId, setSessionId] = useState<number | null>(null);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
-  const [classFilter, setClassFilter] = useState<string>("all");
   const [sections, setSections] = useState<Section[] | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
@@ -48,6 +52,7 @@ export function SectionsPage() {
   const [copyFrom, setCopyFrom] = useState<number | null>(null);
   const [preview, setPreview] = useState<CopySectionsResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [viewing, setViewing] = useState<Section | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -58,7 +63,6 @@ export function SectionsPage() {
         ]);
         setSessions(list);
         setClasses(classList);
-        setSessionId(list.effectiveCurrentId ?? list.items[0]?.id ?? null);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed to load academic setup");
       }
@@ -75,6 +79,13 @@ export function SectionsPage() {
     }
   }
 
+  // The URL picks the session; without one (or with a stale one) fall back to the current session.
+  const sessionId: number | null = useMemo(() => {
+    if (!sessions) return null;
+    const picked = sessions.items.find((s) => String(s.id) === f.sessionId);
+    return picked?.id ?? sessions.effectiveCurrentId ?? sessions.items[0]?.id ?? null;
+  }, [sessions, f.sessionId]);
+
   useEffect(() => {
     if (sessionId != null) void loadSections(sessionId);
   }, [sessionId]);
@@ -85,16 +96,32 @@ export function SectionsPage() {
   const canEdit = can("sections", "Edit") && !closed;
 
   // Group sections by class, in promotion order; show every active class so empty ones can be filled.
+  // While a search or shift filter is on, classes with no matching section are hidden.
+  const narrowing = !!(f.q.trim() || f.shift);
+  const filtered = useMemo(
+    () =>
+      (sections ?? []).filter(
+        (s) =>
+          (!f.shift || s.shift === f.shift) &&
+          (!f.classId || String(s.classId) === f.classId) &&
+          matches(f.q, s.name, s.room, s.classTeacherName, s.className, onAllCampuses ? s.campusCode : null),
+      ),
+    [sections, f.q, f.shift, f.classId, onAllCampuses],
+  );
   const groups = useMemo(() => {
     const byClass = new Map<number, Section[]>();
-    for (const s of sections ?? []) byClass.set(s.classId, [...(byClass.get(s.classId) ?? []), s]);
+    for (const s of filtered) byClass.set(s.classId, [...(byClass.get(s.classId) ?? []), s]);
     return classes
-      .filter((c) => (classFilter === "all" ? c.isActive || byClass.has(c.id) : String(c.id) === classFilter))
+      .filter((c) => (!f.classId ? c.isActive || byClass.has(c.id) : String(c.id) === f.classId))
       .filter((c) => c.campusId == null || onAllCampuses || c.campusId === activeCampusId)
+      .filter((c) => !narrowing || byClass.has(c.id))
       .map((c) => ({ cls: c, items: byClass.get(c.id) ?? [] }));
-  }, [classes, sections, classFilter, onAllCampuses, activeCampusId]);
+  }, [classes, filtered, f.classId, narrowing, onAllCampuses, activeCampusId]);
 
   const total = sections?.length ?? 0;
+  // The session picker is not a filter for counting purposes: it picks which list exists.
+  const filterCount = activeCount - (f.sessionId ? 1 : 0);
+  const clearFilters = () => set({ classId: "", q: "", shift: "" });
   const otherSessions = (sessions?.items ?? []).filter((s) => s.id !== sessionId);
 
   function openNew(classId?: number) {
@@ -225,32 +252,53 @@ export function SectionsPage() {
         }
       />
 
-      <div className="mb-5 flex flex-wrap items-center gap-3">
-        <Select
-          aria-label="Session"
-          value={sessionId ?? ""}
-          onChange={(e) => setSessionId(Number(e.target.value))}
-          className="w-auto min-w-[180px]"
+      <div className="panel mb-5 overflow-hidden">
+        <FilterBar
+          className="border-b-0"
+          shown={sections ? filtered.length : null}
+          total={total}
+          noun={["section", "sections"]}
+          activeCount={filterCount}
+          onClear={clearFilters}
         >
-          {(sessions?.items ?? []).map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-              {s.campusCode ? ` (${s.campusCode})` : ""}
-              {s.id === sessions?.effectiveCurrentId ? " · Current" : ""}
-            </option>
-          ))}
-        </Select>
-        <Select aria-label="Class" value={classFilter} onChange={(e) => setClassFilter(e.target.value)} className="w-auto min-w-[160px]">
-          <option value="all">All classes</option>
-          {classes.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </Select>
-        <span className="text-xs text-[var(--muted-foreground)]">
-          <span className="tabular font-medium text-[var(--foreground)]">{total}</span> sections
-        </span>
+          <SearchField
+            value={f.q}
+            onChange={(q) => set({ q })}
+            debounce={200}
+            placeholder="Section, room or class teacher"
+            className="sm:max-w-xs"
+          />
+          <Select
+            aria-label="Session"
+            value={sessionId ?? ""}
+            onChange={(e) => set({ sessionId: Number(e.target.value) === sessions?.effectiveCurrentId ? "" : e.target.value })}
+            className="w-auto"
+          >
+            {(sessions?.items ?? []).map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+                {s.campusCode ? ` (${s.campusCode})` : ""}
+                {s.id === sessions?.effectiveCurrentId ? " · Current" : ""}
+              </option>
+            ))}
+          </Select>
+          <Select aria-label="Class" value={f.classId} onChange={(e) => set({ classId: e.target.value })} className="w-auto">
+            <option value="">All classes</option>
+            {classes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+          <Select aria-label="Shift" value={f.shift} onChange={(e) => set({ shift: e.target.value })} className="w-auto">
+            <option value="">All shifts</option>
+            {(Object.keys(shiftLabel) as SectionShift[]).map((s) => (
+              <option key={s} value={s}>
+                {shiftLabel[s]}
+              </option>
+            ))}
+          </Select>
+        </FilterBar>
       </div>
 
       {closed ? (
@@ -272,7 +320,11 @@ export function SectionsPage() {
             </div>
           ))}
         </div>
-      ) : total === 0 && classFilter === "all" ? (
+      ) : total > 0 && narrowing && groups.length === 0 ? (
+        <div className="panel">
+          <NoResults noun="sections" icon={LayoutGrid} onClear={clearFilters} />
+        </div>
+      ) : total === 0 && !f.classId ? (
         <div className="panel">
           <EmptyState
             icon={LayoutGrid}
@@ -315,10 +367,10 @@ export function SectionsPage() {
                     <button
                       key={s.id}
                       type="button"
-                      onClick={() => (canEdit ? openEdit(s) : undefined)}
+                      onClick={() => setViewing(s)}
                       className={cn(
                         "min-w-[96px] rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-left transition outline-none focus-visible:ring-4 focus-visible:ring-[var(--ring)]",
-                        canEdit && "hover:border-[var(--primary)]/50 hover:shadow-[var(--shadow-sm)]",
+                        "hover:border-[var(--primary)]/50 hover:shadow-[var(--shadow-sm)]",
                         !s.isActive && "opacity-60",
                       )}
                     >
@@ -333,6 +385,13 @@ export function SectionsPage() {
                       <div className="mt-0.5 text-xs text-[var(--muted-foreground)]">
                         {[shiftLabel[s.shift], s.capacity != null ? `${s.capacity} seats` : null, s.room].filter(Boolean).join(" · ")}
                       </div>
+                      <div className="mt-0.5 max-w-[160px] truncate text-xs">
+                        {s.classTeacherName ? (
+                          <span className="text-[var(--foreground)]">{s.classTeacherName}</span>
+                        ) : (
+                          <span className="text-[var(--muted-foreground)] italic">No class teacher</span>
+                        )}
+                      </div>
                     </button>
                   ))
                 )}
@@ -341,6 +400,19 @@ export function SectionsPage() {
           ))}
         </div>
       )}
+
+      {viewing ? (
+        <SectionTeachersDialog
+          section={viewing}
+          closedSession={!!closed}
+          onClose={() => setViewing(null)}
+          onEdit={canEdit ? () => (setViewing(null), openEdit(viewing)) : undefined}
+          onChanged={(updated) => {
+            setViewing(updated);
+            setSections((list) => list?.map((x) => (x.id === updated.id ? updated : x)) ?? list);
+          }}
+        />
+      ) : null}
 
       <Modal
         open={!!draft}

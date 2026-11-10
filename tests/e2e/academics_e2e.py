@@ -111,7 +111,7 @@ def actions(detail, key):
 def seed(hq):
     a, _ = demo_campuses(hq)
     me = data(call("GET", "/auth/me", token=hq))
-    check("HQ All-campuses top menu order", menu_keys(me) == ["dashboard", "campuses", "academics", "settings"], menu_keys(me))
+    check("HQ All-campuses top menu order", menu_keys(me) == ["dashboard", "campuses", "academics", "students-menu", "staff-menu", "attendance-menu", "exams-menu", "settings"], menu_keys(me))
     academics = next((m for m in me["menu"] if m["key"] == "academics"), None)
     check("academics children", academics and [c["key"] for c in academics["children"]]
           == ["academic-sessions", "classes", "subjects", "sections"], academics)
@@ -220,7 +220,7 @@ def roles_ownership(hq):
 
     ca_role = role_id(hq, "CampusAdmin")
     s, r = call("POST", "/users", user_payload(campus_ids=[a], role_ids=[ca_role]), token=ca, campus=a)
-    check("campus admin cannot assign CampusAdmin", s == 403 and "Only HQ can assign this role." in str(r), (s, r))
+    check("campus admin cannot assign CampusAdmin", s == 403 and "Only Main Campus can assign this role." in str(r), (s, r))
     if s == 200:
         track("users", r["data"]["id"])
     assignable = [x["name"] for x in data(call("GET", "/roles?assignable=true", token=ca, campus=a))]

@@ -141,7 +141,7 @@ export function MyCampusPage() {
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Panel title="Campus profile" description={canEdit ? "Code and status are managed by head office." : "Read only"} className="lg:col-span-2">
+        <Panel title="Campus profile" description={canEdit ? "Code and status are managed by Main Campus." : "Read only"} className="lg:col-span-2">
           {!form ? (
             <div className="space-y-3">
               <Skeleton className="h-9 w-full" />
@@ -263,7 +263,7 @@ export function MyCampusPage() {
                   {current ? (
                     <>
                       {current.name}
-                      <StatusPill tone={current.campusCode ? "primary" : "info"}>{current.campusCode ?? "HQ"}</StatusPill>
+                      <StatusPill tone={current.campusCode ? "primary" : "info"}>{current.campusCode ?? "Main Campus"}</StatusPill>
                     </>
                   ) : (
                     "—"

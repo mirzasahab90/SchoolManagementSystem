@@ -32,6 +32,19 @@ public static class RoleDefaultsSeeder
             [AppModules.Classes] = Full,
             [AppModules.Subjects] = Full,
             [AppModules.Sections] = Full,
+            [AppModules.Students] = Full,
+            [AppModules.Guardians] = Full,
+            [AppModules.Vacancies] = Full,
+            [AppModules.Candidates] = Full,
+            [AppModules.Staff] = Full,
+            [AppModules.Attendance] = Full,
+            [AppModules.AttendanceReports] = [V],
+            [AppModules.StaffAttendance] = Full,
+            [AppModules.Calendar] = Full,
+            [AppModules.Exams] = Full,
+            [AppModules.Marks] = Full,
+            [AppModules.Results] = Full,
+            [AppModules.Grading] = Full,
         },
         [SystemRoles.Teacher] = new()
         {
@@ -39,18 +52,66 @@ public static class RoleDefaultsSeeder
             [AppModules.Sections] = [V],
             [AppModules.Classes] = [V],
             [AppModules.Subjects] = [V],
+            [AppModules.Students] = [V],
+            [AppModules.Attendance] = [V, A, E],
+            [AppModules.AttendanceReports] = [V],
+            [AppModules.Exams] = [V],
+            [AppModules.Marks] = [V, E],
+            [AppModules.Results] = [V],
         },
         [SystemRoles.Clerk] = new()
         {
             [AppModules.Dashboard] = [V],
             [AppModules.Sections] = [V],
             [AppModules.Users] = [V, A],
+            [AppModules.Students] = [V, A],
+            [AppModules.Guardians] = [V, E],
+            [AppModules.Attendance] = [V],
+            [AppModules.AttendanceReports] = [V],
+            [AppModules.StaffAttendance] = [V, A, E],
+            [AppModules.Calendar] = [V],
+            [AppModules.Exams] = [V],
+            [AppModules.Results] = [V],
         },
         [SystemRoles.Accountant] = new()
         {
             [AppModules.Dashboard] = [V],
         },
     };
+
+    /// <summary>
+    /// When a module is created by this seed run, give the HQ system roles their default grants for it.
+    /// Later runs see the module already exists and add nothing, so HQ's edits are never overwritten.
+    /// </summary>
+    public static async Task GrantNewModulesAsync(SchoolManagementSystemDbContext db, IReadOnlySet<string> createdKeys, CancellationToken ct)
+    {
+        if (createdKeys.Count == 0) return;
+
+        var roles = await db.Roles.IgnoreQueryFilters().Where(r => !r.IsDeleted && r.CampusId == null && r.IsSystem).ToListAsync(ct);
+        var modules = await db.Modules.Where(m => createdKeys.Contains(m.Key)).ToDictionaryAsync(m => m.Key, StringComparer.OrdinalIgnoreCase, ct);
+        var permissions = await db.Permissions.ToDictionaryAsync(p => p.Code, StringComparer.OrdinalIgnoreCase, ct);
+        var roleIds = roles.Select(r => r.Id).ToList();
+        var existing = (await db.RoleModulePermissions.Where(x => roleIds.Contains(x.RoleId))
+                .Select(x => new { x.RoleId, x.ModuleId, x.PermissionId }).ToListAsync(ct))
+            .Select(x => (x.RoleId, x.ModuleId, x.PermissionId)).ToHashSet();
+
+        foreach (var role in roles)
+        {
+            if (!Defaults.TryGetValue(role.Name, out var grants)) continue;
+            foreach (var (moduleKey, actions) in grants)
+            {
+                if (!modules.TryGetValue(moduleKey, out var module)) continue;
+                foreach (var action in actions)
+                {
+                    if (!permissions.TryGetValue(action, out var permission)) continue;
+                    if (!existing.Add((role.Id, module.Id, permission.Id))) continue;
+                    db.RoleModulePermissions.Add(new RoleModulePermission { RoleId = role.Id, ModuleId = module.Id, PermissionId = permission.Id });
+                }
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+    }
 
     public static async Task SeedAsync(SchoolManagementSystemDbContext db, CancellationToken ct)
     {

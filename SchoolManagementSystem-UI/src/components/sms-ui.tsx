@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import type {
   ButtonHTMLAttributes,
   ComponentType,
@@ -6,7 +7,7 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from "react";
-import { Check, Inbox, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, ChevronLeft, ChevronRight, FilterX, Inbox, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type IconType = ComponentType<{ className?: string }>;
@@ -189,7 +190,7 @@ export function Field({
 }
 
 const controlBase =
-  "w-full rounded-lg border border-[var(--border)] bg-[var(--card)] text-sm text-[var(--foreground)] shadow-[var(--shadow-xs)] outline-none transition placeholder:text-[var(--muted-foreground)]/70 hover:border-[var(--border-strong)] focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-60";
+  "w-full rounded-lg border border-[var(--border-strong)] bg-[var(--card)] text-sm text-[var(--foreground)] shadow-[var(--shadow-xs)] outline-none transition placeholder:text-[var(--muted-foreground)]/70 hover:border-[var(--control-border)] focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-60";
 
 export function TextInput({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={cn(controlBase, "h-9 px-3", className)} {...props} />;
@@ -208,27 +209,80 @@ export function SearchField({
   onChange,
   placeholder = "Search…",
   className,
+  debounce = 0,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  /** Milliseconds to wait after typing stops before calling onChange. */
+  debounce?: number;
 }) {
+  const [text, setText] = useState(value);
+  const last = useRef(value);
+  const notify = useRef(onChange);
+  notify.current = onChange;
+  // Follow outside changes (e.g. "Clear filters", back button).
+  useEffect(() => {
+    if (value !== last.current) {
+      last.current = value;
+      setText(value);
+    }
+  }, [value]);
+  useEffect(() => {
+    if (!debounce || text === last.current) return;
+    const t = setTimeout(() => {
+      last.current = text;
+      notify.current(text);
+    }, debounce);
+    return () => clearTimeout(t);
+  }, [text, debounce]);
+
+  const emit = (v: string) => {
+    setText(v);
+    if (!debounce) {
+      last.current = v;
+      onChange(v);
+    }
+  };
+
   return (
     <div className={cn("relative w-full sm:max-w-xs", className)}>
       <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-[var(--muted-foreground)]" />
       <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={text}
+        onChange={(e) => emit(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape" && text) {
+            e.preventDefault();
+            last.current = "";
+            setText("");
+            onChange("");
+          }
+        }}
         placeholder={placeholder}
         aria-label={placeholder}
-        className={cn(controlBase, "h-9 pr-3 pl-9")}
+        className={cn(controlBase, "h-9 pr-8 pl-9")}
       />
+      {text ? (
+        <button
+          type="button"
+          aria-label="Clear search"
+          title="Clear search"
+          onClick={() => {
+            last.current = "";
+            setText("");
+            onChange("");
+          }}
+          className="absolute top-1/2 right-2 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+        >
+          <X className="size-3.5" />
+        </button>
+      ) : null}
     </div>
   );
 }
 
-/** An on/off switch with a label, used for boolean settings. */
 export function Switch({
   checked,
   onChange,
@@ -252,7 +306,7 @@ export function Switch({
         onClick={() => onChange(!checked)}
         className={cn(
           "relative mt-0.5 inline-flex h-5 w-9 shrink-0 rounded-full transition-colors outline-none focus-visible:ring-4 focus-visible:ring-[var(--ring)]",
-          checked ? "bg-[var(--primary)]" : "bg-[var(--border-strong)]",
+          checked ? "bg-[var(--primary)]" : "bg-[var(--control-border)]",
         )}
       >
         <span
@@ -319,10 +373,10 @@ export function CheckMark({ checked, className }: { checked: boolean; className?
     <span
       aria-hidden
       className={cn(
-        "mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded-[5px] border transition",
+        "mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded-[5px] border-[1.5px] transition",
         checked
-          ? "border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)]"
-          : "border-[var(--border-strong)] bg-[var(--card)]",
+          ? "border-[color:var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)]"
+          : "border-[color:var(--checkbox-border)] bg-[var(--card)]",
         className,
       )}
     >
@@ -406,23 +460,57 @@ export function DataTable({ children }: { children: ReactNode }) {
   );
 }
 
-export function THead({ columns }: { columns: { label: string; align?: "left" | "right" | "center"; className?: string }[] }) {
+export type SortState = { key: string; dir: "asc" | "desc" };
+
+export function THead({
+  columns,
+  sort,
+  onSort,
+}: {
+  columns: { label: string; align?: "left" | "right" | "center"; className?: string; sortKey?: string }[];
+  /** Current sort; columns with a sortKey become clickable when onSort is given. */
+  sort?: SortState | null;
+  onSort?: (next: SortState | null) => void;
+}) {
   return (
     <thead>
       <tr className="border-b border-[var(--border)] bg-[var(--muted)]/60">
-        {columns.map((c) => (
-          <th
-            key={c.label}
-            className={cn(
-              "px-5 py-2.5 text-xs font-medium text-[var(--muted-foreground)]",
-              c.align === "right" && "text-right",
-              c.align === "center" && "text-center",
-              c.className,
-            )}
-          >
-            {c.label}
-          </th>
-        ))}
+        {columns.map((c) => {
+          const sortable = !!(c.sortKey && onSort);
+          const active = sortable && sort?.key === c.sortKey;
+          const Icon = !active ? ArrowUpDown : sort?.dir === "desc" ? ArrowDown : ArrowUp;
+          return (
+            <th
+              key={c.label}
+              aria-sort={active ? (sort?.dir === "desc" ? "descending" : "ascending") : undefined}
+              className={cn(
+                "px-5 py-2.5 text-xs font-medium text-[var(--muted-foreground)]",
+                c.align === "right" && "text-right",
+                c.align === "center" && "text-center",
+                c.className,
+              )}
+            >
+              {sortable ? (
+                <button
+                  type="button"
+                  // asc → desc → off
+                  onClick={() =>
+                    onSort!(!active ? { key: c.sortKey!, dir: "asc" } : sort?.dir === "asc" ? { key: c.sortKey!, dir: "desc" } : null)
+                  }
+                  className={cn(
+                    "group inline-flex items-center gap-1 rounded outline-none hover:text-[var(--foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                    active && "text-[var(--foreground)]",
+                  )}
+                >
+                  {c.label}
+                  <Icon className={cn("size-3", !active && "opacity-0 group-hover:opacity-60 group-focus-visible:opacity-60")} />
+                </button>
+              ) : (
+                c.label
+              )}
+            </th>
+          );
+        })}
       </tr>
     </thead>
   );
@@ -574,5 +662,157 @@ export function Kbd({ children }: { children: ReactNode }) {
     <kbd className="rounded border border-[var(--border)] bg-[var(--muted)] px-1.5 py-0.5 font-sans text-[10px] font-medium text-[var(--muted-foreground)]">
       {children}
     </kbd>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Filtering and paging                                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The filter row above a list: controls on the left; result count and "Clear filters" on the right.
+ * `shown` is how many match, `total` how many exist without filters (omit when unknown).
+ */
+export function FilterBar({
+  children,
+  shown,
+  total,
+  noun,
+  activeCount = 0,
+  onClear,
+  className,
+}: {
+  children?: ReactNode;
+  shown?: number | null;
+  total?: number | null;
+  noun?: [string, string];
+  activeCount?: number;
+  onClear?: () => void;
+  className?: string;
+}) {
+  const word = noun ? (shown === 1 ? noun[0] : noun[1]) : "";
+  return (
+    <Toolbar className={className}>
+      <div className="flex w-full flex-wrap items-center gap-2">
+        {children}
+        <div className="ml-auto flex items-center gap-3 text-xs text-[var(--muted-foreground)]">
+          {shown != null ? (
+            <span aria-live="polite">
+              {activeCount > 0 && total != null && total !== shown ? (
+                <>
+                  <span className="tabular font-medium text-[var(--foreground)]">{shown}</span> of{" "}
+                  <span className="tabular">{total}</span> {word}
+                </>
+              ) : (
+                <>
+                  <span className="tabular font-medium text-[var(--foreground)]">{shown}</span> {word}
+                </>
+              )}
+            </span>
+          ) : null}
+          {activeCount > 0 && onClear ? (
+            <Btn type="button" size="sm" variant="ghost" onClick={onClear} title="Reset every filter">
+              <FilterX />
+              Clear filters
+              <span className="tabular rounded-full bg-[var(--primary-soft)] px-1.5 text-[10px] font-semibold text-[var(--primary-soft-foreground)]">
+                {activeCount}
+              </span>
+            </Btn>
+          ) : null}
+        </div>
+      </div>
+    </Toolbar>
+  );
+}
+
+/** Empty state for "the filters hide everything", with a way out. */
+export function NoResults({ noun = "results", onClear, icon }: { noun?: string; onClear?: () => void; icon?: IconType }) {
+  return (
+    <EmptyState
+      icon={icon ?? Search}
+      title={`No matching ${noun}`}
+      description="Nothing matches the current search and filters."
+      action={
+        onClear ? (
+          <Btn type="button" variant="outline" onClick={onClear}>
+            <FilterX />
+            Clear filters
+          </Btn>
+        ) : null
+      }
+    />
+  );
+}
+
+export function Pagination({
+  page,
+  pageSize,
+  total,
+  onPage,
+  onPageSize,
+  pageSizes = [10, 25, 50, 100],
+}: {
+  page: number;
+  pageSize: number;
+  total: number;
+  onPage: (page: number) => void;
+  onPageSize?: (size: number) => void;
+  pageSizes?: number[];
+}) {
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const current = Math.min(Math.max(1, page), pages);
+  const from = total === 0 ? 0 : (current - 1) * pageSize + 1;
+  const to = Math.min(current * pageSize, total);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] px-5 py-3 text-xs text-[var(--muted-foreground)]">
+      <span>
+        Showing <span className="tabular">{from}</span>–<span className="tabular">{to}</span> of{" "}
+        <span className="tabular">{total}</span>
+      </span>
+      <div className="flex flex-wrap items-center gap-2">
+        {onPageSize ? (
+          <label className="flex items-center gap-1.5">
+            Rows
+            <select
+              aria-label="Rows per page"
+              value={pageSize}
+              onChange={(e) => onPageSize(Number(e.target.value))}
+              className={cn(controlBase, "h-8 w-auto px-2 text-xs")}
+            >
+              {pageSizes.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        <Btn type="button" size="sm" variant="outline" disabled={current <= 1} onClick={() => onPage(current - 1)} aria-label="Previous page">
+          <ChevronLeft />
+          <span className="hidden sm:inline">Prev</span>
+        </Btn>
+        <label className="flex items-center gap-1.5">
+          <span className="sr-only">Page</span>
+          <select
+            aria-label="Page"
+            value={current}
+            onChange={(e) => onPage(Number(e.target.value))}
+            disabled={pages <= 1}
+            className={cn(controlBase, "h-8 w-auto px-2 text-xs")}
+          >
+            {Array.from({ length: Math.min(pages, 500) }, (_, i) => (
+              <option key={i + 1} value={i + 1}>
+                {i + 1}
+              </option>
+            ))}
+          </select>
+          <span>of {pages}</span>
+        </label>
+        <Btn type="button" size="sm" variant="outline" disabled={current >= pages} onClick={() => onPage(current + 1)} aria-label="Next page">
+          <span className="hidden sm:inline">Next</span>
+          <ChevronRight />
+        </Btn>
+      </div>
+    </div>
   );
 }

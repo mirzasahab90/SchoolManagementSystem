@@ -59,8 +59,23 @@ public class SectionService(SchoolManagementSystemRepositories repositories, ICu
         if (section == null) return Error.NotFound("Section");
         if (section.AcademicSession.Status == SessionStatus.Closed) return Closed;
 
+        // Teachers keep no hidden open assignments on a deleted section.
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        await using var tx = await repositories.BeginTransactionAsync(ct);
+        var open = await repositories.Teaching.OpenForSectionAsync(section.Id, ct);
+        foreach (var assignment in open)
+        {
+            assignment.EndedOn = today < assignment.StartedOn ? assignment.StartedOn : today;
+            assignment.EndReason = "Section deleted";
+        }
+
+        section.ClassTeacherStaffId = null;
+        await repositories.SaveChangesAsync(ct);
+        repositories.Teaching.Detach(open); // soft delete of the section must not try to sever these rows
+
         repositories.Sections.Remove(section);
         await repositories.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         return Result.Ok("Section deleted.");
     }
 

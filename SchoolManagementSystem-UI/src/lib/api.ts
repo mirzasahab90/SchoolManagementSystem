@@ -25,7 +25,7 @@ export const tokenStore = {
   getAccess: () => read(ACCESS_KEY),
   setAccess: (token: string) => write(ACCESS_KEY, token),
   clearAccess: () => write(ACCESS_KEY, null),
-  /** Null = no campus header (HQ "All campuses", or server default). */
+  /** Null = no campus header (Main Campus "All campuses", or server default). */
   getCampusId: () => {
     const raw = read(CAMPUS_KEY);
     return raw ? Number(raw) : null;
@@ -79,4 +79,25 @@ export async function unwrap<T>(promise: Promise<{ data: ApiResponse<T> }>): Pro
     throw new Error(data.message || "Request failed");
   }
   return data.data as T;
+}
+
+/** Downloads a protected file through the API (auth + campus headers) and returns it with its file name. */
+export async function downloadBlob(url: string): Promise<{ blob: Blob; fileName: string | null }> {
+  const res = await api.get(url, { responseType: "blob" });
+  const disposition = String(res.headers["content-disposition"] ?? "");
+  const match = /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(disposition);
+  const fileName = match ? decodeURIComponent(match[1] ?? match[2]) : null;
+  return { blob: res.data as Blob, fileName };
+}
+
+/** Saves a blob to the user's device under the given name. */
+export function saveBlob(blob: Blob, fileName: string) {
+  const href = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 1000);
 }

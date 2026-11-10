@@ -10,6 +10,26 @@ import { SubjectsPage } from "@/pages/academics/subjects";
 import { CampusesPage } from "@/pages/campuses";
 import { ChangePasswordPage } from "@/pages/change-password";
 import { MyCampusPage } from "@/pages/my-campus";
+import { GuardianDetailPage } from "@/pages/guardians/detail";
+import { GuardiansListPage } from "@/pages/guardians/list";
+import { AdmissionPage } from "@/pages/students/admission";
+import { StudentsListPage } from "@/pages/students/list";
+import { StudentProfilePage } from "@/pages/students/profile";
+import { VacanciesPage } from "@/pages/hiring/vacancies";
+import { CandidatesPage } from "@/pages/hiring/candidates";
+import { CandidateProfilePage } from "@/pages/hiring/candidate";
+import { StaffListPage } from "@/pages/staff/list";
+import { StaffProfilePage } from "@/pages/staff/profile";
+import { MarkAttendancePage } from "@/pages/attendance/mark";
+import { AttendanceReportsPage } from "@/pages/attendance/reports";
+import { StaffAttendancePage } from "@/pages/attendance/staff";
+import { CalendarPage } from "@/pages/attendance/calendar";
+import { ExamsPage } from "@/pages/exams/list";
+import { ExamDetailPage } from "@/pages/exams/detail";
+import { MarksEntryPage } from "@/pages/exams/marks";
+import { ResultsPage } from "@/pages/exams/results";
+import { GradingPage } from "@/pages/exams/grading";
+import { ReportCardsPage } from "@/pages/exams/cards";
 import { DashboardPage } from "@/pages/dashboard";
 import { LoginPage } from "@/pages/login";
 import { RolesPage } from "@/pages/roles";
@@ -55,6 +75,26 @@ export default function App() {
         <Route path="academics/classes" element={<ClassesPage />} />
         <Route path="academics/subjects" element={<SubjectsPage />} />
         <Route path="academics/sections" element={<SectionsPage />} />
+        <Route path="students" element={<StudentsListPage />} />
+        <Route path="students/new" element={<AdmissionPage />} />
+        <Route path="students/:id" element={<StudentProfilePage />} />
+        <Route path="guardians" element={<GuardiansListPage />} />
+        <Route path="guardians/:id" element={<GuardianDetailPage />} />
+        <Route path="hiring/vacancies" element={<VacanciesPage />} />
+        <Route path="hiring/candidates" element={<CandidatesPage />} />
+        <Route path="hiring/candidates/:id" element={<CandidateProfilePage />} />
+        <Route path="staff" element={<StaffListPage />} />
+        <Route path="staff/:id" element={<StaffProfilePage />} />
+        <Route path="attendance" element={<MarkAttendancePage />} />
+        <Route path="attendance/reports" element={<AttendanceReportsPage />} />
+        <Route path="attendance/staff" element={<StaffAttendancePage />} />
+        <Route path="attendance/calendar" element={<CalendarPage />} />
+        <Route path="exams" element={<ExamsPage />} />
+        <Route path="exams/marks" element={<MarksEntryPage />} />
+        <Route path="exams/results" element={<ResultsPage />} />
+        <Route path="exams/grading" element={<GradingPage />} />
+        <Route path="exams/cards" element={<ReportCardsPage />} />
+        <Route path="exams/:id" element={<ExamDetailPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/admin" replace />} />
     </Routes>

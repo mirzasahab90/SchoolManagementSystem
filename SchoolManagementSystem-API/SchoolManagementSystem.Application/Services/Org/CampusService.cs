@@ -31,7 +31,7 @@ public class CampusService(
 
     public async Task<Result<CampusDto>> CreateAsync(SaveCampusRequest request, CancellationToken ct = default)
     {
-        if (!currentUser.IsHq) return Error.Forbidden("Only HQ users can add campuses.");
+        if (!currentUser.IsHq) return Error.Forbidden("Only Main Campus users can add campuses.");
 
         var validation = Validate(request);
         if (validation != null) return validation;
@@ -94,7 +94,7 @@ public class CampusService(
         {
             // Campus staff may update details, but not the code or whether the campus is active.
             if (!string.Equals(code, campus.Code, StringComparison.Ordinal) || request.IsActive != campus.IsActive)
-                return Error.Forbidden("Only HQ users can change a campus code or status.");
+                return Error.Forbidden("Only Main Campus users can change a campus code or status.");
         }
 
         if (await repositories.Campuses.CodeExistsAsync(code, id, ct))
@@ -114,7 +114,7 @@ public class CampusService(
 
     public async Task<Result> DeleteAsync(int id, CancellationToken ct = default)
     {
-        if (!currentUser.IsHq) return Error.Forbidden("Only HQ users can delete campuses.");
+        if (!currentUser.IsHq) return Error.Forbidden("Only Main Campus users can delete campuses.");
 
         var campus = await repositories.Campuses.GetTrackedAsync(id, ct);
         if (campus == null) return Error.NotFound("Campus");

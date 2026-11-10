@@ -14,6 +14,22 @@ public class SchoolManagementSystemRepositories(SchoolManagementSystemDbContext 
     private SubjectRepository? _subjects;
     private ClassRepository? _classes;
     private SectionRepository? _sections;
+    private StudentRepository? _students;
+    private EnrollmentRepository? _enrollments;
+    private GuardianRepository? _guardians;
+    private SequenceRepository? _sequences;
+    private VacancyRepository? _vacancies;
+    private CandidateRepository? _candidates;
+    private StaffRepository? _staff;
+    private TeachingRepository? _teaching;
+    private CalendarRepository? _calendar;
+    private AttendanceRepository? _attendance;
+    private AttendanceReportRepository? _attendanceReports;
+    private StaffAttendanceRepository? _staffAttendance;
+    private GradingRepository? _grading;
+    private ExamRepository? _exams;
+    private MarkRepository? _marks;
+    private ResultRepository? _results;
 
     public AccessRepository Access => _access ??= new AccessRepository(dbContext);
     public UserRepository Users => _users ??= new UserRepository(dbContext);
@@ -25,6 +41,22 @@ public class SchoolManagementSystemRepositories(SchoolManagementSystemDbContext 
     public SubjectRepository Subjects => _subjects ??= new SubjectRepository(dbContext);
     public ClassRepository Classes => _classes ??= new ClassRepository(dbContext);
     public SectionRepository Sections => _sections ??= new SectionRepository(dbContext);
+    public StudentRepository Students => _students ??= new StudentRepository(dbContext);
+    public EnrollmentRepository Enrollments => _enrollments ??= new EnrollmentRepository(dbContext);
+    public GuardianRepository Guardians => _guardians ??= new GuardianRepository(dbContext);
+    public SequenceRepository Sequences => _sequences ??= new SequenceRepository(dbContext);
+    public VacancyRepository Vacancies => _vacancies ??= new VacancyRepository(dbContext);
+    public CandidateRepository Candidates => _candidates ??= new CandidateRepository(dbContext);
+    public StaffRepository Staff => _staff ??= new StaffRepository(dbContext);
+    public TeachingRepository Teaching => _teaching ??= new TeachingRepository(dbContext);
+    public CalendarRepository Calendar => _calendar ??= new CalendarRepository(dbContext);
+    public AttendanceRepository Attendance => _attendance ??= new AttendanceRepository(dbContext);
+    public AttendanceReportRepository AttendanceReports => _attendanceReports ??= new AttendanceReportRepository(dbContext);
+    public StaffAttendanceRepository StaffAttendance => _staffAttendance ??= new StaffAttendanceRepository(dbContext);
+    public GradingRepository Grading => _grading ??= new GradingRepository(dbContext);
+    public ExamRepository Exams => _exams ??= new ExamRepository(dbContext);
+    public MarkRepository Marks => _marks ??= new MarkRepository(dbContext);
+    public ResultRepository Results => _results ??= new ResultRepository(dbContext);
 
     public Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginTransactionAsync(CancellationToken ct = default) =>
         dbContext.Database.BeginTransactionAsync(ct);

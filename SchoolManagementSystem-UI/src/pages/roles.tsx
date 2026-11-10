@@ -8,7 +8,9 @@ import {
   DataTable,
   EmptyState,
   Field,
+  FilterBar,
   IconButton,
+  NoResults,
   PageHeader,
   Panel,
   SearchField,
@@ -19,12 +21,12 @@ import {
   Td,
   TextInput,
   THead,
-  Toolbar,
   Tr,
 } from "@/components/sms-ui";
 import { canWriteOwned, OwnerPill } from "@/components/owner-pill";
 import { useAuth } from "@/lib/auth";
 import { api, unwrap } from "@/lib/api";
+import { matches, useUrlFilters } from "@/lib/filters";
 import type { ModulePermissionCell, RoleDetail, RoleListItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -48,13 +50,13 @@ export function RolesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
-  const [query, setQuery] = useState("");
+  const { values: f, set, clear, activeCount: filterCount } = useUrlFilters({ q: "", status: "", owner: "" });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<RoleListItem | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // HQ roles are shared by every campus and only HQ changes them; a campus manages its own roles.
+  // Main Campus roles are shared by every campus and only Main Campus changes them; a campus manages its own roles.
   const isHq = !!me?.isHq;
   const holdsRole = !!detail && !!me?.roles.includes(detail.name);
   const isSuperAdminRole = detail?.name === "SuperAdmin";
@@ -63,7 +65,7 @@ export function RolesPage() {
     ownsDetail && can("roles", "Edit") && (!holdsRole || !!me?.isSuperAdmin) && (!isSuperAdminRole || !!me?.isSuperAdmin);
   const canAdd = can("roles", "Add") && (isHq || me?.activeCampusId != null);
   const [newOwner, setNewOwner] = useState<string>("hq");
-  /** Outside HQ a role can only be given permissions its editor holds (the API enforces this too). */
+  /** Outside Main Campus a role can only be given permissions its editor holds (the API enforces this too). */
   const cellAllowed = (moduleKey: string, action: ActionKey) => isHq || can(moduleKey, action);
 
   async function load() {
@@ -81,11 +83,17 @@ export function RolesPage() {
     void load();
   }, []);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((r) => [r.name, r.description ?? ""].join(" ").toLowerCase().includes(q));
-  }, [items, query]);
+  const filtered = useMemo(
+    () =>
+      items.filter((r) => {
+        if (f.status === "active" && !r.isActive) return false;
+        if (f.status === "inactive" && r.isActive) return false;
+        if (f.owner === "main" && r.campusId != null) return false;
+        if (f.owner === "campus" && r.campusId == null) return false;
+        return matches(f.q, r.name, r.description, r.campusCode);
+      }),
+    [items, f.status, f.owner, f.q],
+  );
 
   async function openEdit(id: number) {
     try {
@@ -188,8 +196,8 @@ export function RolesPage() {
   }
 
   const grantedCount = matrix.reduce((sum, row) => sum + ACTIONS.filter((a) => row[a.key]).length, 0);
-  // Ticked permissions the editor does not hold (e.g. added by HQ). The API refuses to save these, so the
-  // editor must untick them or ask HQ — say so instead of failing on save.
+  // Ticked permissions the editor does not hold (e.g. added by Main Campus). The API refuses to save these, so the
+  // editor must untick them or ask Main Campus — say so instead of failing on save.
   const beyondMe = canEdit
     ? matrix.flatMap((row) => ACTIONS.filter((a) => row[a.key] && !cellAllowed(row.moduleKey, a.key)).map((a) => `${row.moduleName} ${a.label}`))
     : [];
@@ -199,7 +207,7 @@ export function RolesPage() {
     <div>
       <PageHeader
         title="Roles & permissions"
-        description="Roles decide what people can view, add, edit or delete. Head-office roles are shared by every campus; a campus can add its own."
+        description="Roles decide what people can view, add, edit or delete. Main Campus roles are shared by every campus; a campus can add its own."
         actions={
           canAdd ? (
             <Btn type="button" onClick={() => setCreateOpen(true)}>
@@ -213,23 +221,50 @@ export function RolesPage() {
       {!isHq ? (
         <div className="mb-5 flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--info-soft)] px-4 py-3 text-sm text-[var(--info)]">
           <Info className="mt-0.5 size-4 shrink-0" />
-          Head-office roles (HQ) are shared by every campus and are read only for you. Add roles for your own campus when you need
+          Main Campus roles are shared by every campus and are read only for you. Add roles for your own campus when you need
           something different.
         </div>
       ) : null}
 
       <Panel flush>
-        <Toolbar>
-          <SearchField value={query} onChange={setQuery} placeholder="Search roles" />
-          <div className="text-xs text-[var(--muted-foreground)]">
-            <span className="tabular font-medium text-[var(--foreground)]">{items.length}</span> roles
-          </div>
-        </Toolbar>
+        <FilterBar
+          shown={loading ? null : filtered.length}
+          total={items.length}
+          noun={["role", "roles"]}
+          activeCount={filterCount}
+          onClear={clear}
+        >
+          <SearchField value={f.q} onChange={(q) => set({ q })} debounce={200} placeholder="Search roles" className="sm:max-w-xs" />
+          <Select value={f.status} onChange={(e) => set({ status: e.target.value })} aria-label="Filter by status" className="w-auto">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </Select>
+          <Select value={f.owner} onChange={(e) => set({ owner: e.target.value })} aria-label="Filter by owner" className="w-auto">
+            <option value="">All owners</option>
+            <option value="main">Main Campus</option>
+            <option value="campus">Campus roles</option>
+          </Select>
+        </FilterBar>
 
         {loading ? (
           <TableSkeleton cols={5} />
+        ) : items.length === 0 ? (
+          <EmptyState
+            icon={Shield}
+            title="No roles yet"
+            description="Add a role, then choose what it can view, add, edit or delete."
+            action={
+              canAdd ? (
+                <Btn type="button" onClick={() => setCreateOpen(true)}>
+                  <Plus />
+                  Add role
+                </Btn>
+              ) : null
+            }
+          />
         ) : filtered.length === 0 ? (
-          <EmptyState icon={Shield} title="No roles found" description="Try a different search." />
+          <NoResults noun="roles" icon={Shield} onClear={clear} />
         ) : (
           <DataTable>
             <THead
@@ -332,7 +367,7 @@ export function RolesPage() {
           {detail && !ownsDetail ? (
             <div className="flex items-start gap-2.5 rounded-lg bg-[var(--info-soft)] px-3 py-2.5 text-sm text-[var(--info)]">
               <Lock className="mt-0.5 size-4 shrink-0" />
-              Head-office role, shared by every campus. Only HQ can change it.
+              Main Campus role, shared by every campus. Only Main Campus can change it.
             </div>
           ) : null}
           {ownsDetail && holdsRole && !me?.isSuperAdmin ? (
@@ -345,8 +380,8 @@ export function RolesPage() {
             <div className="flex items-start gap-2.5 rounded-lg bg-[var(--warning-soft)] px-3 py-2.5 text-sm text-[var(--warning)]">
               <Lock className="mt-0.5 size-4 shrink-0" />
               <span>
-                This role has permissions you don&apos;t have ({beyondMe.join(", ")}), probably added by head office. Untick them to
-                save your changes, or ask HQ to make the change.
+                This role has permissions you don&apos;t have ({beyondMe.join(", ")}), probably added by Main Campus. Untick them to
+                save your changes, or ask Main Campus to make the change.
               </span>
             </div>
           ) : null}
@@ -419,7 +454,7 @@ export function RolesPage() {
                               disabled={!canEdit || (!cellAllowed(row.moduleKey, a.key) && !row[a.key])}
                               title={canEdit && !cellAllowed(row.moduleKey, a.key) ? "You don't have this permission" : undefined}
                               onClick={() => toggle(row.moduleKey, a.key)}
-                              className="inline-flex rounded p-1 outline-none focus-visible:ring-4 focus-visible:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-60"
+                              className="inline-flex rounded p-1 outline-none focus-visible:ring-4 focus-visible:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-75"
                             >
                               <CheckMark checked={row[a.key]} className="mt-0" />
                             </button>
@@ -464,9 +499,9 @@ export function RolesPage() {
             <TextInput value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="What this role is for" />
           </Field>
           {isHq && me?.activeCampusId == null ? (
-            <Field label="Owner" hint="HQ roles are shared by every campus.">
+            <Field label="Owner" hint="Main Campus roles are shared by every campus.">
               <Select value={newOwner} onChange={(e) => setNewOwner(e.target.value)}>
-                <option value="hq">Head office (all campuses)</option>
+                <option value="hq">Main Campus (all campuses)</option>
                 {me?.campuses.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} only
