@@ -45,6 +45,10 @@ public static class RoleDefaultsSeeder
             [AppModules.Marks] = Full,
             [AppModules.Results] = Full,
             [AppModules.Grading] = Full,
+            [AppModules.FeeSetup] = Full,
+            [AppModules.FeeVouchers] = Full,
+            [AppModules.FeeCollection] = Full,
+            [AppModules.FeeReports] = Full,
         },
         [SystemRoles.Teacher] = new()
         {
@@ -72,10 +76,16 @@ public static class RoleDefaultsSeeder
             [AppModules.Calendar] = [V],
             [AppModules.Exams] = [V],
             [AppModules.Results] = [V],
+            [AppModules.FeeVouchers] = [V],
+            [AppModules.FeeCollection] = [V, A],
         },
         [SystemRoles.Accountant] = new()
         {
             [AppModules.Dashboard] = [V],
+            [AppModules.FeeSetup] = Full,
+            [AppModules.FeeVouchers] = Full,
+            [AppModules.FeeCollection] = Full,
+            [AppModules.FeeReports] = Full,
         },
     };
 

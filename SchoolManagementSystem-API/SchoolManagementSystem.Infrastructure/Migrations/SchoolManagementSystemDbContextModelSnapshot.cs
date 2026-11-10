@@ -1063,6 +1063,500 @@ namespace SchoolManagementSystem.Infrastructure.Migrations
                     b.ToTable("StudentResults", (string)null);
                 });
 
+            modelBuilder.Entity("SchoolManagementSystem.Domain.Entities.Fees.FeeHead", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("CampusId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Frequency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("ModifiedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<int?>("OneTimeMonth")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CampusId", "Name")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.ToTable("FeeHeads", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagementSystem.Domain.Entities.Fees.FeePayment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("AddedLateFine")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<int>("CampusId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("FeeVoucherId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsVoid")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int?>("ModifiedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateOnly>("PaidOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("ReceiptNo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("ReceivedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("VoidReason")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int?>("VoidedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("VoidedOn")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FeeVoucherId");
+
+                    b.HasIndex("ReceiptNo")
+                        .IsUnique();
+
+                    b.HasIndex("CampusId", "PaidOn");
+
+                    b.ToTable("FeePayments", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagementSystem.Domain.Entities.Fees.FeeSettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AccountNo")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("AccountTitle")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("BankName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("CampusId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ChallanNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("ConcessionHeadIds")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("DueDay")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("LateFine")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<int?>("ModifiedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("SiblingSecondPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<decimal?>("SiblingThirdPlusPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<decimal?>("StaffChildPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CampusId")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.ToTable("FeeSettings", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagementSystem.Domain.Entities.Fees.FeeStructure", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AcademicSessionId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<int?>("CampusId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ClassId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("FeeHeadId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("ModifiedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AcademicSessionId");
+
+                    b.HasIndex("ClassId");
+
+                    b.HasIndex("FeeHeadId");
+
+                    b.HasIndex("CampusId", "AcademicSessionId", "ClassId", "FeeHeadId")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.ToTable("FeeStructures", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagementSystem.Domain.Entities.Fees.FeeVoucher", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AcademicSessionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CampusId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int?>("CarriedToVoucherId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateOnly>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<int>("EnrollmentId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateOnly>("IssueDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("LateFineAmount")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<bool>("LateFineApplied")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("ModifiedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateOnly>("Month")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("Paid")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(15)
+                        .HasColumnType("nvarchar(15)");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Total")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("VoucherNo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AcademicSessionId");
+
+                    b.HasIndex("CarriedToVoucherId");
+
+                    b.HasIndex("EnrollmentId");
+
+                    b.HasIndex("VoucherNo")
+                        .IsUnique();
+
+                    b.HasIndex("CampusId", "Month");
+
+                    b.HasIndex("StudentId", "Month")
+                        .IsUnique()
+                        .HasFilter("[Status] <> 'Cancelled' AND [IsDeleted] = 0");
+
+                    b.ToTable("FeeVouchers", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagementSystem.Domain.Entities.Fees.FeeVoucherLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("Concession")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("ConcessionNote")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<int?>("FeeHeadId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("FeeVoucherId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("FromVoucherId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("nvarchar(12)");
+
+                    b.Property<decimal>("Net")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FeeHeadId");
+
+                    b.HasIndex("FeeVoucherId");
+
+                    b.ToTable("FeeVoucherLines", (string)null);
+                });
+
+            modelBuilder.Entity("SchoolManagementSystem.Domain.Entities.Fees.StudentConcession", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AcademicSessionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CampusId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FeeHeadId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("nvarchar(12)");
+
+                    b.Property<int?>("ModifiedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int?>("StaffId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Value")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("ValueType")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AcademicSessionId");
+
+                    b.HasIndex("CampusId");
+
+                    b.HasIndex("FeeHeadId");
+
+                    b.HasIndex("StaffId");
+
+                    b.HasIndex("StudentId", "AcademicSessionId", "FeeHeadId", "Kind")
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1 AND [IsDeleted] = 0");
+
+                    b.ToTable("StudentConcessions", (string)null);
+                });
+
             modelBuilder.Entity("SchoolManagementSystem.Domain.Entities.Hiring.Candidate", b =>
                 {
                     b.Property<int>("Id")
@@ -2808,6 +3302,158 @@ namespace SchoolManagementSystem.Infrastructure.Migrations
                     b.Navigation("Section");
                 });
 
+            modelBuilder.Entity("SchoolManagementSystem.Domain.Entities.Fees.FeeHead", b =>
+                {
+                    b.HasOne("SchoolManagementSystem.Domain.Entities.Org.Campus", "Campus")
+                        .WithMany()
+                        .HasForeignKey("CampusId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Campus");
+                });
+
+            modelBuilder.Entity("SchoolManagementSystem.Domain.Entities.Fees.FeePayment", b =>
+                {
+                    b.HasOne("SchoolManagementSystem.Domain.Entities.Org.Campus", null)
+                        .WithMany()
+                        .HasForeignKey("CampusId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SchoolManagementSystem.Domain.Entities.Fees.FeeVoucher", "FeeVoucher")
+                        .WithMany("Payments")
+                        .HasForeignKey("FeeVoucherId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("FeeVoucher");
+                });
+
+            modelBuilder.Entity("SchoolManagementSystem.Domain.Entities.Fees.FeeSettings", b =>
+                {
+                    b.HasOne("SchoolManagementSystem.Domain.Entities.Org.Campus", null)
+                        .WithMany()
+                        .HasForeignKey("CampusId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("SchoolManagementSystem.Domain.Entities.Fees.FeeStructure", b =>
+                {
+                    b.HasOne("SchoolManagementSystem.Domain.Entities.Academics.AcademicSession", null)
+                        .WithMany()
+                        .HasForeignKey("AcademicSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SchoolManagementSystem.Domain.Entities.Org.Campus", null)
+                        .WithMany()
+                        .HasForeignKey("CampusId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SchoolManagementSystem.Domain.Entities.Academics.SchoolClass", "Class")
+                        .WithMany()
+                        .HasForeignKey("ClassId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SchoolManagementSystem.Domain.Entities.Fees.FeeHead", "FeeHead")
+                        .WithMany()
+                        .HasForeignKey("FeeHeadId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Class");
+
+                    b.Navigation("FeeHead");
+                });
+
+            modelBuilder.Entity("SchoolManagementSystem.Domain.Entities.Fees.FeeVoucher", b =>
+                {
+                    b.HasOne("SchoolManagementSystem.Domain.Entities.Academics.AcademicSession", null)
+                        .WithMany()
+                        .HasForeignKey("AcademicSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SchoolManagementSystem.Domain.Entities.Org.Campus", null)
+                        .WithMany()
+                        .HasForeignKey("CampusId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SchoolManagementSystem.Domain.Entities.Fees.FeeVoucher", null)
+                        .WithMany()
+                        .HasForeignKey("CarriedToVoucherId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SchoolManagementSystem.Domain.Entities.Students.Enrollment", "Enrollment")
+                        .WithMany()
+                        .HasForeignKey("EnrollmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SchoolManagementSystem.Domain.Entities.Students.Student", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Enrollment");
+
+                    b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("SchoolManagementSystem.Domain.Entities.Fees.FeeVoucherLine", b =>
+                {
+                    b.HasOne("SchoolManagementSystem.Domain.Entities.Fees.FeeHead", null)
+                        .WithMany()
+                        .HasForeignKey("FeeHeadId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SchoolManagementSystem.Domain.Entities.Fees.FeeVoucher", "FeeVoucher")
+                        .WithMany("Lines")
+                        .HasForeignKey("FeeVoucherId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FeeVoucher");
+                });
+
+            modelBuilder.Entity("SchoolManagementSystem.Domain.Entities.Fees.StudentConcession", b =>
+                {
+                    b.HasOne("SchoolManagementSystem.Domain.Entities.Academics.AcademicSession", null)
+                        .WithMany()
+                        .HasForeignKey("AcademicSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SchoolManagementSystem.Domain.Entities.Org.Campus", null)
+                        .WithMany()
+                        .HasForeignKey("CampusId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SchoolManagementSystem.Domain.Entities.Fees.FeeHead", "FeeHead")
+                        .WithMany()
+                        .HasForeignKey("FeeHeadId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SchoolManagementSystem.Domain.Entities.Hiring.Staff", null)
+                        .WithMany()
+                        .HasForeignKey("StaffId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SchoolManagementSystem.Domain.Entities.Students.Student", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("FeeHead");
+
+                    b.Navigation("Student");
+                });
+
             modelBuilder.Entity("SchoolManagementSystem.Domain.Entities.Hiring.Candidate", b =>
                 {
                     b.HasOne("SchoolManagementSystem.Domain.Entities.Org.Campus", "Campus")
@@ -3132,6 +3778,13 @@ namespace SchoolManagementSystem.Infrastructure.Migrations
             modelBuilder.Entity("SchoolManagementSystem.Domain.Entities.Exams.GradeScale", b =>
                 {
                     b.Navigation("Bands");
+                });
+
+            modelBuilder.Entity("SchoolManagementSystem.Domain.Entities.Fees.FeeVoucher", b =>
+                {
+                    b.Navigation("Lines");
+
+                    b.Navigation("Payments");
                 });
 
             modelBuilder.Entity("SchoolManagementSystem.Domain.Entities.Hiring.Candidate", b =>

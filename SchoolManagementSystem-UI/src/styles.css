@@ -237,4 +237,37 @@ h3,
   .report-card:last-child {
     break-after: auto;
   }
+  .challan-sheet {
+    page: challan;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    break-after: page;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .challan-sheet:last-child {
+    break-after: auto;
+  }
+  .challan-sheet > div {
+    min-width: 0 !important;
+  }
+  .receipt-slip {
+    page: receipt;
+    border: none !important;
+    box-shadow: none !important;
+    max-width: none !important;
+  }
+}
+
+@page challan {
+  size: A4 landscape;
+  margin: 8mm;
+}
+
+@page receipt {
+  size: A5;
+  margin: 8mm;
 }

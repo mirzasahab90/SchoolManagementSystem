@@ -31,6 +31,7 @@ public class DatabaseSeeder(
         await RoleDefaultsSeeder.GrantNewModulesAsync(db, _createdModules, ct);
         await AcademicSeeder.SeedAsync(db, ct);
         await ExamSeeder.SeedAsync(db, ct);
+        await FeeSeeder.SeedAsync(db, ct);
         logger.LogInformation("Database seed completed.");
     }
 
@@ -78,7 +79,8 @@ public class DatabaseSeeder(
         var staffMenu = await Upsert(AppModules.StaffMenu, "Staff", null, "briefcase", 6, null);
         var attendanceMenu = await Upsert(AppModules.AttendanceMenu, "Attendance", null, "calendar-check", 7, null);
         var examsMenu = await Upsert(AppModules.ExamsMenu, "Exams", null, "file-pen", 8, null);
-        var settings = await Upsert(AppModules.Settings, "Settings", null, "settings", 9, null);
+        var feesMenu = await Upsert(AppModules.FeesMenu, "Fees", null, "wallet", 9, null);
+        var settings = await Upsert(AppModules.Settings, "Settings", null, "settings", 10, null);
         await db.SaveChangesAsync(ct);
 
         await Upsert(AppModules.AcademicSessions, "Sessions", "/admin/academics/sessions", "calendar-range", 1, academics.Id, campusLevel: true);
@@ -98,6 +100,10 @@ public class DatabaseSeeder(
         await Upsert(AppModules.Marks, "Marks entry", "/admin/exams/marks", "pencil-line", 2, examsMenu.Id, campusLevel: true);
         await Upsert(AppModules.Results, "Results", "/admin/exams/results", "trophy", 3, examsMenu.Id, campusLevel: true);
         await Upsert(AppModules.Grading, "Grading", "/admin/exams/grading", "sliders-horizontal", 4, examsMenu.Id, campusLevel: true);
+        await Upsert(AppModules.FeeSetup, "Fee setup", "/admin/fees/setup", "settings-2", 1, feesMenu.Id, campusLevel: true);
+        await Upsert(AppModules.FeeVouchers, "Challans", "/admin/fees/challans", "receipt", 2, feesMenu.Id, campusLevel: true);
+        await Upsert(AppModules.FeeCollection, "Collect fee", "/admin/fees/collect", "hand-coins", 3, feesMenu.Id, campusLevel: true);
+        await Upsert(AppModules.FeeReports, "Fee reports", "/admin/fees/reports", "chart-column", 4, feesMenu.Id, campusLevel: true);
         await Upsert(AppModules.Users, "Users", "/admin/users", "users", 1, settings.Id, campusLevel: true);
         await Upsert(AppModules.Roles, "Roles", "/admin/roles", "shield", 2, settings.Id, campusLevel: true);
         await db.SaveChangesAsync(ct);

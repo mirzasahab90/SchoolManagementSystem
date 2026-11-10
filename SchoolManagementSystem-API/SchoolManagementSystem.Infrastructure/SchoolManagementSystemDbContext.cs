@@ -8,6 +8,7 @@ using SchoolManagementSystem.Domain.Common;
 using SchoolManagementSystem.Domain.Entities.Academics;
 using SchoolManagementSystem.Domain.Entities.Attendance;
 using SchoolManagementSystem.Domain.Entities.Exams;
+using SchoolManagementSystem.Domain.Entities.Fees;
 using SchoolManagementSystem.Domain.Entities.Hiring;
 using SchoolManagementSystem.Domain.Entities.Identity;
 using SchoolManagementSystem.Domain.Entities.Org;
@@ -66,6 +67,13 @@ public class SchoolManagementSystemDbContext(DbContextOptions<SchoolManagementSy
     public DbSet<SectionResult> SectionResults => Set<SectionResult>();
     public DbSet<StudentResult> StudentResults => Set<StudentResult>();
     public DbSet<ResultRemark> ResultRemarks => Set<ResultRemark>();
+    public DbSet<FeeHead> FeeHeads => Set<FeeHead>();
+    public DbSet<FeeStructure> FeeStructures => Set<FeeStructure>();
+    public DbSet<FeeSettings> FeeSettings => Set<FeeSettings>();
+    public DbSet<StudentConcession> StudentConcessions => Set<StudentConcession>();
+    public DbSet<FeeVoucher> FeeVouchers => Set<FeeVoucher>();
+    public DbSet<FeeVoucherLine> FeeVoucherLines => Set<FeeVoucherLine>();
+    public DbSet<FeePayment> FeePayments => Set<FeePayment>();
 
     /// <summary>Campuses the current request may read; evaluated per query by the EF filters below.</summary>
     private IReadOnlyCollection<int> CampusFilterIds => currentUser.DataCampusIds ?? [];

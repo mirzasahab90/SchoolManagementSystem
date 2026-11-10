@@ -32,7 +32,7 @@ def rand_digits(n):
 def schema(hq):
     me = data(call("GET", "/auth/me", token=hq))
     check("top menu includes Staff group",
-          menu_keys(me) == ["dashboard", "campuses", "academics", "students-menu", "staff-menu", "attendance-menu", "exams-menu", "settings"], menu_keys(me))
+          menu_keys(me) == ["dashboard", "campuses", "academics", "students-menu", "staff-menu", "attendance-menu", "exams-menu", "fees-menu", "settings"], menu_keys(me))
     grp = next((m for m in me["menu"] if m["key"] == "staff-menu"), None)
     check("staff group children", grp and [c["key"] for c in grp["children"]] == ["vacancies", "candidates", "staff"], grp)
     full = {"view", "add", "edit", "delete"}

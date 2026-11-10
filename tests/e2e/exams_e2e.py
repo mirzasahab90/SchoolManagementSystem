@@ -37,7 +37,7 @@ def bands(pairs, fail="F"):
 def schema(hq):
     me = data(call("GET", "/auth/me", token=hq))
     check("menu has Exams after Attendance", menu_keys(me) == ["dashboard", "campuses", "academics", "students-menu", "staff-menu",
-                                                              "attendance-menu", "exams-menu", "settings"], menu_keys(me))
+                                                              "attendance-menu", "exams-menu", "fees-menu", "settings"], menu_keys(me))
     grp = next((m for m in me["menu"] if m["key"] == "exams-menu"), None)
     check("exams children", grp and [c["key"] for c in grp["children"]] == ["exams", "marks", "results", "grading"], grp)
     full, view = {"view", "add", "edit", "delete"}, {"view"}

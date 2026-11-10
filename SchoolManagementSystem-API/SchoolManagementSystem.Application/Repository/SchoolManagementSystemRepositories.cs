@@ -30,6 +30,10 @@ public class SchoolManagementSystemRepositories(SchoolManagementSystemDbContext 
     private ExamRepository? _exams;
     private MarkRepository? _marks;
     private ResultRepository? _results;
+    private FeeSetupRepository? _feeSetup;
+    private ConcessionRepository? _concessions;
+    private VoucherRepository? _vouchers;
+    private FeeReportRepository? _feeReports;
 
     public AccessRepository Access => _access ??= new AccessRepository(dbContext);
     public UserRepository Users => _users ??= new UserRepository(dbContext);
@@ -57,6 +61,10 @@ public class SchoolManagementSystemRepositories(SchoolManagementSystemDbContext 
     public ExamRepository Exams => _exams ??= new ExamRepository(dbContext);
     public MarkRepository Marks => _marks ??= new MarkRepository(dbContext);
     public ResultRepository Results => _results ??= new ResultRepository(dbContext);
+    public FeeSetupRepository FeeSetup => _feeSetup ??= new FeeSetupRepository(dbContext);
+    public ConcessionRepository Concessions => _concessions ??= new ConcessionRepository(dbContext);
+    public VoucherRepository Vouchers => _vouchers ??= new VoucherRepository(dbContext);
+    public FeeReportRepository FeeReports => _feeReports ??= new FeeReportRepository(dbContext);
 
     public Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginTransactionAsync(CancellationToken ct = default) =>
         dbContext.Database.BeginTransactionAsync(ct);

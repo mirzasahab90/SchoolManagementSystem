@@ -70,7 +70,7 @@ def working_days_back(token, campus, count, start_offset=0):
 def schema(hq):
     me = data(call("GET", "/auth/me", token=hq))
     check("menu has Attendance after Staff", menu_keys(me) == ["dashboard", "campuses", "academics", "students-menu", "staff-menu",
-                                                              "attendance-menu", "exams-menu", "settings"], menu_keys(me))
+                                                              "attendance-menu", "exams-menu", "fees-menu", "settings"], menu_keys(me))
     grp = next((m for m in me["menu"] if m["key"] == "attendance-menu"), None)
     check("attendance children", grp and [c["key"] for c in grp["children"]] == ["attendance", "attendance-reports", "staff-attendance", "calendar"], grp)
     full, view = {"view", "add", "edit", "delete"}, {"view"}

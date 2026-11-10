@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 
 /** Keys that are list state, not filters: they never count as "active" and survive "Clear filters" (except page). */
-const NOT_FILTERS = new Set(["page", "pageSize", "sort", "dir", "tab", "view"]);
+const NOT_FILTERS = new Set(["page", "pageSize", "sort", "dir", "tab", "view", "open"]);
 
 export type SortDir = "asc" | "desc";
 

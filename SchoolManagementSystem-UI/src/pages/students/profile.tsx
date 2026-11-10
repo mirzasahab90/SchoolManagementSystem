@@ -20,6 +20,7 @@ import { ConfirmDialog, Modal } from "@/components/modal";
 import { StudentPhoto } from "@/components/student-photo";
 import { StudentAttendanceTab } from "./attendance-tab";
 import { StudentResultsTab } from "./results-tab";
+import { StudentFeesTab } from "./fees-tab";
 import {
   Btn,
   EmptyState,
@@ -51,7 +52,7 @@ import {
   type StudentProfile,
 } from "@/lib/types";
 
-type Tab = "overview" | "guardians" | "documents" | "attendance" | "results" | "history";
+type Tab = "overview" | "guardians" | "documents" | "attendance" | "results" | "fees" | "history";
 
 const formatDate = (v?: string | null) =>
   v ? new Date(v.length === 10 ? `${v}T00:00:00` : v).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—";
@@ -228,6 +229,7 @@ export function StudentProfilePage() {
             ["documents", `Documents (${profile.documents.length})`],
             ...(canSeeAttendance ? ([["attendance", "Attendance"]] as [Tab, string][]) : []),
             ...(canSeeResults ? ([["results", "Results"]] as [Tab, string][]) : []),
+            ...(can("fee-vouchers", "View") || can("fee-collection", "View") ? ([["fees", "Fees"]] as [Tab, string][]) : []),
             ["history", "History"],
           ] as [Tab, string][]
         ).map(([key, label]) => (
@@ -250,6 +252,7 @@ export function StudentProfilePage() {
       {tab === "documents" ? <DocumentsTab profile={profile} canEdit={canEdit} onChange={load} /> : null}
       {tab === "attendance" ? <StudentAttendanceTab studentId={student.id} /> : null}
       {tab === "results" ? <StudentResultsTab studentId={student.id} /> : null}
+      {tab === "fees" ? <StudentFeesTab studentId={student.id} /> : null}
       {tab === "history" ? <HistoryTab profile={profile} /> : null}
 
       {dialog === "edit" ? <EditDialog profile={profile} onClose={() => setDialog(null)} onSaved={set} /> : null}

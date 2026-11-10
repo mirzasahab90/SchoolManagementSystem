@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type {
+  Ref,
   ButtonHTMLAttributes,
   ComponentType,
   InputHTMLAttributes,
@@ -192,7 +193,7 @@ export function Field({
 const controlBase =
   "w-full rounded-lg border border-[var(--border-strong)] bg-[var(--card)] text-sm text-[var(--foreground)] shadow-[var(--shadow-xs)] outline-none transition placeholder:text-[var(--muted-foreground)]/70 hover:border-[var(--control-border)] focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-60";
 
-export function TextInput({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+export function TextInput({ className, ...props }: InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement> }) {
   return <input className={cn(controlBase, "h-9 px-3", className)} {...props} />;
 }
 
@@ -404,16 +405,19 @@ export function StatusPill({
   children,
   tone = "neutral",
   dot = false,
+  className,
 }: {
   children: ReactNode;
   tone?: StatusTone;
   dot?: boolean;
+  className?: string;
 }) {
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium whitespace-nowrap",
         toneStyles[tone],
+        className,
       )}
     >
       {dot ? <span className="size-1.5 shrink-0 rounded-full bg-current" /> : null}

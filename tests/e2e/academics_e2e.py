@@ -111,7 +111,7 @@ def actions(detail, key):
 def seed(hq):
     a, _ = demo_campuses(hq)
     me = data(call("GET", "/auth/me", token=hq))
-    check("HQ All-campuses top menu order", menu_keys(me) == ["dashboard", "campuses", "academics", "students-menu", "staff-menu", "attendance-menu", "exams-menu", "settings"], menu_keys(me))
+    check("HQ All-campuses top menu order", menu_keys(me) == ["dashboard", "campuses", "academics", "students-menu", "staff-menu", "attendance-menu", "exams-menu", "fees-menu", "settings"], menu_keys(me))
     academics = next((m for m in me["menu"] if m["key"] == "academics"), None)
     check("academics children", academics and [c["key"] for c in academics["children"]]
           == ["academic-sessions", "classes", "subjects", "sections"], academics)

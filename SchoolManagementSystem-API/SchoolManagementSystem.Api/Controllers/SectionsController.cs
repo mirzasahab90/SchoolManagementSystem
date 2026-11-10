@@ -27,7 +27,7 @@ public class SectionsController(ISectionService sectionService, IStaffService st
         FromResult(await staffService.GetSectionTeachersAsync(id, ct));
 
     [HttpGet]
-    [HasAnyPermission("sections:View", "students:View")]
+    [HasAnyPermission("sections:View", "students:View", "fee-setup:View", "fee-vouchers:View", "fee-reports:View")]
     public async Task<ActionResult<ResponseDto<IReadOnlyList<SectionDto>>>> List([FromQuery] int? sessionId, [FromQuery] int? classId, CancellationToken ct) =>
         FromResult(await sectionService.ListAsync(sessionId, classId, ct));
 

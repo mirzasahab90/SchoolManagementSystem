@@ -31,4 +31,9 @@ public static class AppModules
     public const string Marks = "marks";
     public const string Results = "results";
     public const string Grading = "grading";
+    public const string FeesMenu = "fees-menu";
+    public const string FeeSetup = "fee-setup";
+    public const string FeeVouchers = "fee-vouchers";
+    public const string FeeCollection = "fee-collection";
+    public const string FeeReports = "fee-reports";
 }

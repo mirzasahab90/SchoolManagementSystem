@@ -21,7 +21,7 @@ def group(fn):
 @group
 def schema(hq):
     me = data(call("GET", "/auth/me", token=hq))
-    check("HQ top menu includes Students group", menu_keys(me) == ["dashboard", "campuses", "academics", "students-menu", "staff-menu", "attendance-menu", "exams-menu", "settings"],
+    check("HQ top menu includes Students group", menu_keys(me) == ["dashboard", "campuses", "academics", "students-menu", "staff-menu", "attendance-menu", "exams-menu", "fees-menu", "settings"],
           menu_keys(me))
     grp = next((m for m in me["menu"] if m["key"] == "students-menu"), None)
     check("students group children", grp and [c["key"] for c in grp["children"]] == ["students", "guardians"], grp)

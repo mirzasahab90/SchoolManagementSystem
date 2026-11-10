@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode, type RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import {
+  ChartColumn,
+  HandCoins,
+  Receipt,
+  Settings2,
+  Wallet,
   FilePen,
   FileText,
   PencilLine,
@@ -78,6 +83,11 @@ const iconMap: Record<string, ComponentType<{ className?: string }>> = {
   "pencil-line": PencilLine,
   trophy: Trophy,
   "sliders-horizontal": SlidersHorizontal,
+  wallet: Wallet,
+  "settings-2": Settings2,
+  receipt: Receipt,
+  "hand-coins": HandCoins,
+  "chart-column": ChartColumn,
 };
 
 const COLLAPSE_KEY = "schoolms.sidebarCollapsed";

@@ -1073,3 +1073,186 @@ export type StudentExamResult = {
   position?: number | null;
 };
 export type StudentResults = { exams: StudentExamResult[]; annual?: AnnualCalc | null };
+
+// ---------------------------------------------------------------- fees
+
+export type FeeFrequency = "Monthly" | "OneTime";
+export type ConcessionKind = "Manual" | "StaffChild";
+export type ConcessionValueType = "Percent" | "Fixed";
+export type VoucherStatus = "Unpaid" | "PartiallyPaid" | "Paid" | "CarriedForward" | "Cancelled";
+export type VoucherLineKind = "Head" | "Arrears" | "LateFine" | "Adjustment";
+export type PaymentMethod = "Cash" | "Bank" | "Online";
+
+export const voucherStatusLabel: Record<VoucherStatus, string> = {
+  Unpaid: "Unpaid",
+  PartiallyPaid: "Partly paid",
+  Paid: "Paid",
+  CarriedForward: "Carried forward",
+  Cancelled: "Cancelled",
+};
+
+export type FeeHead = {
+  id: number;
+  campusId?: number | null;
+  name: string;
+  frequency: FeeFrequency;
+  oneTimeMonth?: number | null;
+  sortOrder: number;
+  isActive: boolean;
+};
+
+export type StructureCell = { feeHeadId: number; mainAmount?: number | null; campusAmount?: number | null; effective?: number | null };
+export type StructureRow = { classId: number; className: string; cells: StructureCell[] };
+export type StructureGrid = { sessionId: number; heads: FeeHead[]; rows: StructureRow[] };
+
+export type FeeSettings = {
+  dueDay: number;
+  lateFine: number;
+  siblingSecondPercent: number;
+  siblingThirdPlusPercent: number;
+  staffChildPercent: number;
+  concessionHeadIds: number[];
+  bankName?: string | null;
+  accountTitle?: string | null;
+  accountNo?: string | null;
+  challanNote?: string | null;
+  hasCampusOverride: boolean;
+  /** Fields the campus has set itself; the rest come from Main Campus. */
+  overriddenFields: string[];
+};
+
+export type LineCalc = { feeHeadId: number; description: string; amount: number; concession: number; concessionNote?: string | null; net: number };
+
+export type Concession = {
+  id: number;
+  studentId: number;
+  studentName: string;
+  admissionNo: string;
+  className?: string | null;
+  sectionName?: string | null;
+  sessionId: number;
+  feeHeadId?: number | null;
+  headName: string;
+  kind: ConcessionKind;
+  staffId?: number | null;
+  staffName?: string | null;
+  valueType: ConcessionValueType;
+  value: number;
+  reason: string;
+  isActive: boolean;
+};
+
+export type StaffChildSuggestion = { studentId: number; studentName: string; className: string; staffId: number; staffName: string; maskedCnic: string };
+
+export type GenerateRow = {
+  studentId: number;
+  name: string;
+  admissionNo: string;
+  className: string;
+  sectionName: string;
+  lines: LineCalc[];
+  arrears: number;
+  total: number;
+  skippedReason?: string | null;
+};
+export type GeneratePreview = { month: string; dueDate: string; toCreate: number; skipped: number; total: number; rows: GenerateRow[] };
+export type GenerateResult = { created: number; skipped: number };
+
+export type Voucher = {
+  id: number;
+  voucherNo: string;
+  studentId: number;
+  studentName: string;
+  admissionNo: string;
+  className: string;
+  sectionName: string;
+  rollNo: number;
+  month: string;
+  issueDate: string;
+  dueDate: string;
+  total: number;
+  lateFineAmount: number;
+  lateFineApplied: boolean;
+  paid: number;
+  balance: number;
+  payableAfterDue: number;
+  status: VoucherStatus;
+};
+
+export type VoucherLine = { id: number; kind: VoucherLineKind; description: string; amount: number; concession: number; concessionNote?: string | null; net: number };
+
+export type FeePayment = {
+  id: number;
+  receiptNo: string;
+  voucherId: number;
+  voucherNo: string;
+  amount: number;
+  paidOn: string;
+  method: PaymentMethod;
+  reference?: string | null;
+  receivedBy: string;
+  isVoid: boolean;
+  voidReason?: string | null;
+};
+
+export type VoucherDetail = { voucher: Voucher; lines: VoucherLine[]; payments: FeePayment[]; carriedToVoucherId?: number | null; cancelReason?: string | null };
+
+export type VoucherPrint = {
+  schoolName: string;
+  campusName: string;
+  campusAddress?: string | null;
+  campusPhone?: string | null;
+  bankName?: string | null;
+  accountTitle?: string | null;
+  accountNo?: string | null;
+  challanNote?: string | null;
+  voucher: Voucher;
+  guardianName?: string | null;
+  lines: VoucherLine[];
+};
+
+export type CollectLookup = {
+  studentId: number;
+  name: string;
+  admissionNo: string;
+  className: string;
+  sectionName: string;
+  guardianName?: string | null;
+  guardianPhone?: string | null;
+  studentLeft: boolean;
+  openVoucher?: VoucherDetail | null;
+  fineIfPaidToday: number;
+};
+
+export type Receipt = { schoolName: string; campusName: string; payment: FeePayment; voucher: Voucher; studentName: string; className: string; balanceAfter: number };
+
+export type Defaulter = {
+  studentId: number;
+  name: string;
+  admissionNo: string;
+  className: string;
+  sectionName: string;
+  guardianPhone?: string | null;
+  months: number;
+  balance: number;
+  oldestMonth: string;
+  studentLeft: boolean;
+  voucherId: number;
+};
+export type Defaulters = { items: Defaulter[]; total: number; totalBalance: number };
+
+export type CampusTotal = { campusCode: string; campusName: string; billed: number; collected: number; outstanding: number };
+export type CollectionReport = {
+  from: string;
+  to: string;
+  payments: FeePayment[];
+  byMethod: { method: PaymentMethod; count: number; total: number }[];
+  byUser: { user: string; count: number; total: number }[];
+  total: number;
+  voided: number;
+  campuses?: CampusTotal[] | null;
+};
+export type MonthlyRow = { className: string; vouchers: number; billed: number; concession: number; collected: number; outstanding: number; collectionPercent: number };
+export type FeeMonthlyReport = { month: string; rows: MonthlyRow[]; totals: MonthlyRow; campuses?: CampusTotal[] | null };
+export type HeadReport = { month: string; rows: { head: string; amount: number; concession: number; net: number }[] };
+export type StudentFees = { balance: number; vouchers: Voucher[]; payments: FeePayment[] };

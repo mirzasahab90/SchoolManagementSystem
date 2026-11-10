@@ -12,7 +12,8 @@ public class DashboardService(
     SchoolManagementSystemRepositories repositories,
     ICurrentUser currentUser,
     IPermissionChecker permissionChecker,
-    IAttendanceReportService attendanceReports) : IDashboardService
+    IAttendanceReportService attendanceReports,
+    Fees.FeeReportService feeReports) : IDashboardService
 {
     public async Task<Result<DashboardDto>> GetAsync(CancellationToken ct = default)
     {
@@ -81,6 +82,16 @@ public class DashboardService(
             var at = kpis.FindIndex(k => k.Id == "attendance");
             kpis.Insert(at >= 0 ? at + 1 : Math.Min(4, kpis.Count), new("exams", "Exams", examName ?? "—",
                 $"{submitted}/{totalPapers} sections submitted", "primary", "/admin/exams"));
+        }
+
+        if (await Can(AppModules.FeeReports, AppActions.View))
+        {
+            var (collected, outstanding) = await feeReports.DashboardAsync(ct);
+            var at = kpis.FindIndex(k => k.Id == "exams");
+            if (at < 0) at = kpis.FindIndex(k => k.Id == "attendance");
+            kpis.Insert(at >= 0 ? at + 1 : Math.Min(4, kpis.Count), new("fees", "Collected this month",
+                "Rs " + collected.ToString("N0", System.Globalization.CultureInfo.InvariantCulture),
+                "Rs " + outstanding.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + " outstanding", "success", "/admin/fees/reports"));
         }
 
         var quickActions = new List<QuickActionDto>();

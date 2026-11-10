@@ -11,7 +11,7 @@ namespace SchoolManagementSystem.Api.Controllers;
 public class ClassesController(IClassService classService) : ApiControllerBase
 {
     [HttpGet]
-    [HasAnyPermission("classes:View", "sections:View", "students:View", "vacancies:View")]
+    [HasAnyPermission("classes:View", "sections:View", "students:View", "vacancies:View", "fee-setup:View", "fee-vouchers:View", "fee-reports:View")]
     public async Task<ActionResult<ResponseDto<IReadOnlyList<ClassDto>>>> List(CancellationToken ct) =>
         FromResult(await classService.ListAsync(ct));
 

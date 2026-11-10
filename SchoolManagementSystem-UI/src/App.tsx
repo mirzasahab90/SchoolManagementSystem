@@ -30,6 +30,12 @@ import { MarksEntryPage } from "@/pages/exams/marks";
 import { ResultsPage } from "@/pages/exams/results";
 import { GradingPage } from "@/pages/exams/grading";
 import { ReportCardsPage } from "@/pages/exams/cards";
+import { FeeSetupPage } from "@/pages/fees/setup";
+import { ChallansPage } from "@/pages/fees/challans";
+import { ChallanPrintPage } from "@/pages/fees/challan-print";
+import { CollectFeePage } from "@/pages/fees/collect";
+import { ReceiptPrintPage } from "@/pages/fees/receipt-print";
+import { FeeReportsPage } from "@/pages/fees/reports";
 import { DashboardPage } from "@/pages/dashboard";
 import { LoginPage } from "@/pages/login";
 import { RolesPage } from "@/pages/roles";
@@ -95,6 +101,12 @@ export default function App() {
         <Route path="exams/grading" element={<GradingPage />} />
         <Route path="exams/cards" element={<ReportCardsPage />} />
         <Route path="exams/:id" element={<ExamDetailPage />} />
+        <Route path="fees/setup" element={<FeeSetupPage />} />
+        <Route path="fees/challans" element={<ChallansPage />} />
+        <Route path="fees/challans/print" element={<ChallanPrintPage />} />
+        <Route path="fees/collect" element={<CollectFeePage />} />
+        <Route path="fees/receipt/:id" element={<ReceiptPrintPage />} />
+        <Route path="fees/reports" element={<FeeReportsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/admin" replace />} />
     </Routes>

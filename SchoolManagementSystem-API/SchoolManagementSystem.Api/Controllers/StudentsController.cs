@@ -1,4 +1,5 @@
 using SchoolManagementSystem.Domain.DTOs.Exams;
+using SchoolManagementSystem.Domain.DTOs.Fees;
 using Microsoft.AspNetCore.Mvc;
 using SchoolManagementSystem.Api.Infrastructure;
 using SchoolManagementSystem.Api.Security;
@@ -14,6 +15,11 @@ namespace SchoolManagementSystem.Api.Controllers;
 public class StudentsController(
     IStudentService studentService, IStudentFileService fileService, IAttendanceReportService attendance, IReportCardService cards) : ApiControllerBase
 {
+    [HttpGet("{id:int}/fees")]
+    [HasAnyPermission("fee-vouchers:View", "fee-collection:View")]
+    public async Task<ActionResult<ResponseDto<StudentFeesDto>>> Fees(int id, [FromServices] IFeeReportService fees, CancellationToken ct) =>
+        FromResult(await fees.StudentFeesAsync(id, ct));
+
     [HttpGet("{id:int}/results")]
     [HasAnyPermission("students:View", "results:View")]
     public async Task<ActionResult<ResponseDto<StudentResultsDto>>> Results(int id, CancellationToken ct) =>
@@ -25,7 +31,7 @@ public class StudentsController(
         FromResult(await attendance.StudentAsync(id, ct));
 
     [HttpGet]
-    [HasPermission(AppModules.Students, AppActions.View)]
+    [HasAnyPermission("students:View", "fee-setup:Edit")]
     public async Task<ActionResult<ResponseDto<PagedResult<StudentListItemDto>>>> List(
         [FromQuery] string? q, [FromQuery] int? classId, [FromQuery] int? sectionId, [FromQuery] StudentStatus? status,
         [FromQuery] int? sessionId, [FromQuery] DateOnly? admittedFrom, [FromQuery] DateOnly? admittedTo,

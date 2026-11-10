@@ -21,6 +21,14 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
         }
 
         // Two requests raced past a uniqueness check (same admission number, roll number, CNIC, …).
+        if (exception is Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+        {
+            httpContext.Response.StatusCode = StatusCodes.Status409Conflict;
+            await httpContext.Response.WriteAsJsonAsync(
+                new ResponseDto<object>(null, 409, "This record changed while you were saving. Refresh and try again."), cancellationToken);
+            return true;
+        }
+
         if (exception is Microsoft.EntityFrameworkCore.DbUpdateException { InnerException: Microsoft.Data.SqlClient.SqlException { Number: 2601 or 2627 } })
         {
             logger.LogWarning(exception, "Unique constraint conflict");
